@@ -1,0 +1,177 @@
+@model MyCMS2026.Pages.Page.PageIndexModel
+@using MyCMS2026.Services
+@using MyCMS2026.Models
+@inject MeetingService MeetingSvc
+@inject MyCMS2026.Services.KlassenService KlassenSvc
+@{
+    var isAdmin = User.IsInRole("Administrator");
+    var gruppe  = Model.NavItem?.ConfigString ?? "";
+    var pageId  = Model.Id;
+    var meetingKlassen = await KlassenSvc.GetKlassenAsync("meetings");
+
+    // Filter aus Query-String
+    var search = Context.Request.Query["search"].ToString();
+    var status = Context.Request.Query["status"].ToString();
+    var klasse = Context.Request.Query["klasse"].ToString();
+
+    var all = await MeetingSvc.GetAllAsync();
+    if (!string.IsNullOrWhiteSpace(gruppe))
+        all = all.Where(m => m.Gruppe == gruppe).ToList();
+    if (!string.IsNullOrWhiteSpace(search))
+        all = all.Where(m => m.Thema.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                              m.Leitung.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                              m.Beschreibung.Contains(search, StringComparison.OrdinalIgnoreCase)).ToList();
+    if (!string.IsNullOrWhiteSpace(status))
+        all = all.Where(m => m.Status == status).ToList();
+    if (!string.IsNullOrWhiteSpace(klasse))
+        all = all.Where(m => m.Klasse == klasse).ToList();
+}
+
+@* Delete-Forms ausserhalb der Tabelle *@
+@foreach (var m in all)
+{
+    <form id="wDelMeeting-@m.Id" method="post" asp-page="/Meetings/Index" asp-page-handler="Delete" style="display:none">
+        <input type="hidden" name="id" value="@m.Id" />
+        <input type="hidden" name="gruppe" value="@gruppe" />
+    </form>
+}
+
+<div class="modal fade" id="wMeetingConfirmDelete" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title"><i class="bi bi-exclamation-triangle text-danger me-2"></i>Meeting löschen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">Soll <strong id="wMeetingDelName"></strong> wirklich gelöscht werden?</div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-danger" id="wMeetingDelBtn"><i class="bi bi-trash me-1"></i>Löschen</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+    <span class="text-muted small">@all.Count Meeting(s)</span>
+    @if (Model.HasExtendedAccess)
+    {
+        <a asp-page="/Meetings/Edit" asp-route-gruppe="@gruppe" asp-route-returnPageId="@pageId" class="btn btn-cms btn-sm">
+            <i class="bi bi-plus-circle me-1"></i>Neues Meeting
+        </a>
+    }
+</div>
+
+<div class="cms-filter-bar mb-2">
+    <form method="get" class="row g-2 align-items-end">
+        <input type="hidden" name="Id" value="@pageId" />
+        <div class="col-sm-4 col-md-3">
+            <input type="text" name="search" value="@search" class="form-control form-control-sm" placeholder="Suchen..." />
+        </div>
+        <div class="col-sm-3 col-md-2">
+            <select name="status" class="form-select form-select-sm">
+                <option value="">Alle Status</option>
+                @foreach (var s in Meeting.StatusOptions)
+                {
+                    <option value="@s" selected="@(status == s ? "selected" : null)">@s</option>
+                }
+            </select>
+        </div>
+        <div class="col-sm-3 col-md-2">
+            <select name="klasse" class="form-select form-select-sm">
+                <option value="">Alle Klassen</option>
+                @foreach (var k in meetingKlassen)
+                {
+                    <option value="@k" selected="@(klasse == k ? "selected" : null)">@k</option>
+                }
+            </select>
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-cms btn-sm"><i class="bi bi-funnel me-1"></i>Filter</button>
+            <a href="/Page/Index?Id=@pageId" class="btn btn-outline-secondary btn-sm ms-1">Reset</a>
+        </div>
+    </form>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-hover table-sm align-middle mb-0">
+        <thead>
+            <tr>
+                <th>#</th><th>Thema</th><th>Leitung</th><th>Datum</th><th>Status</th><th>Klasse / Gruppe</th><th class="text-end">Aktionen</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var m in all)
+            {
+                var badgeClass = m.Status switch
+                {
+                    "Abgeschlossen" => "badge-abgeschlossen",
+                    "Abgesagt"      => "badge-abgesagt",
+                    _               => "badge-geplant"
+                };
+                <tr onclick="location.href='@Url.Page("/Meetings/Detail", new { id = m.Id, returnPageId = pageId })'" style="cursor:pointer;">
+                    <td class="text-muted small">@m.MeetingNr</td>
+                    <td>
+                        <span class="fw-semibold">@m.Thema</span>
+                        @if (m.Files.Any())
+                        {
+                            <span class="badge bg-light text-muted border ms-1" title="@m.Files.Count Datei(en) angehängt">
+                                <i class="bi bi-paperclip"></i> @m.Files.Count
+                            </span>
+                        }
+                        @if (!string.IsNullOrEmpty(m.Beschreibung))
+                        {
+                            <br /><small class="text-muted">@(m.Beschreibung.Length > 60 ? m.Beschreibung[..60] + "…" : m.Beschreibung)</small>
+                        }
+                    </td>
+                    <td>@m.Leitung</td>
+                    <td class="text-nowrap">@m.Datum.ToString("dd.MM.yy")</td>
+                    <td><span class="badge @badgeClass">@m.Status</span></td>
+                    <td>
+                        @if (!string.IsNullOrEmpty(m.Klasse))
+                        {
+                            <span class="badge bg-light text-dark border me-1">@m.Klasse</span>
+                        }
+                        @if (!string.IsNullOrEmpty(m.Gruppe))
+                        {
+                            <span class="badge bg-secondary">@m.Gruppe</span>
+                        }
+                    </td>
+                    <td class="text-end text-nowrap" onclick="event.stopPropagation()">
+                        <a asp-page="/Meetings/Detail" asp-route-id="@m.Id" asp-route-returnPageId="@pageId" class="btn btn-sm btn-outline-primary" title="Öffnen">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                        @if (Model.HasExtendedAccess)
+                        {
+                            <a asp-page="/Meetings/Edit" asp-route-id="@m.Id" asp-route-gruppe="@gruppe" asp-route-returnPageId="@pageId"
+                               class="btn btn-sm btn-outline-secondary" title="Bearbeiten">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                        }
+                        @if (isAdmin)
+                        {
+                            <button type="button" class="btn btn-sm btn-outline-danger" title="Löschen"
+                                    onclick="wMeetingConfirmDel('@m.Id','@m.Thema.Replace("'","\\'")')">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (!all.Any())
+            {
+                <tr><td colspan="7" class="text-center text-muted py-3">Keine Meetings gefunden.</td></tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<script>
+let wMeetingPendingId = null;
+function wMeetingConfirmDel(id, name) {
+    wMeetingPendingId = 'wDelMeeting-' + id;
+    document.getElementById('wMeetingDelName').textContent = name;
+    new bootstrap.Modal(document.getElementById('wMeetingConfirmDelete')).show();
+}
+document.getElementById('wMeetingDelBtn').addEventListener('click', function () {
+    if (wMeetingPendingId) document.getElementById(wMeetingPendingId).submit();
+});
+</script>

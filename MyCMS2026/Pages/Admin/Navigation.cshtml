@@ -1,0 +1,286 @@
+@page
+@model MyCMS2026.Pages.Admin.NavigationModel
+@{
+    ViewData["Title"] = "Navigation";
+}
+<div>
+    <div class="cms-page-header">
+        <h1 class="cms-page-title"><i class="bi bi-list-nested me-2 fs-4"></i>Navigation verwalten</h1>
+        <button class="btn btn-cms btn-sm" data-bs-toggle="modal" data-bs-target="#modalCreate">
+            <i class="bi bi-plus-lg me-1"></i>Neuer Eintrag
+        </button>
+    </div>
+    <div class="cms-page-body">
+
+    @if (!string.IsNullOrEmpty(Model.Message))
+    {
+        <div class="alert alert-@(Model.IsError ? "danger" : "success") alert-dismissible">
+            @Model.Message
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @{
+        var itemMap = Model.Items.ToDictionary(i => i.Id, i => i.NavigationText);
+    }
+    <div class="table-responsive">
+        <table class="table table-hover table-sm align-middle">
+            <thead >
+                <tr>
+                    <th>Ord.</th>
+                    <th>ID</th>
+                    <th>Parent</th>
+                    <th>Titel</th>
+                    <th>Menütext</th>
+                    <th>Widget</th>
+                    <th>Sichtbar für</th>
+                    <th>Lesen</th>
+                    <th>Bearbeiten</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model.Items.OrderBy(i => i.MenuOrder))
+                {
+                    <tr>
+                        <td>@item.MenuOrder</td>
+                        <td><code>@item.Id</code></td>
+                        <td>
+                            @if (item.ParentId != null && itemMap.TryGetValue(item.ParentId, out var parentName))
+                            {
+                                <span class="text-muted small">@parentName</span>
+                            }
+                            else { <span class="text-muted">–</span> }
+                        </td>
+                        <td>@(string.IsNullOrEmpty(item.ParentId) ? "" : "↳ ")@item.Title</td>
+                        <td>@item.NavigationText</td>
+                        <td><span class="badge bg-info text-dark">@item.Widget</span></td>
+                        <td>@item.VisibilityRole</td>
+                        <td>@item.BasicAccessRole</td>
+                        <td>@item.ExtendedAccessRole</td>
+                        <td>
+                            <button class="btn btn-outline-secondary btn-sm"
+                                    onclick="openEdit('@item.Id','@item.ParentId','@item.Title','@item.NavigationText',
+                                        '@item.VisibilityRole','@item.BasicAccessRole','@item.ExtendedAccessRole',
+                                        '@item.Widget','@item.ConfigString','@item.MenuOrder')">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <form method="post" asp-page-handler="Delete" class="d-inline">
+                                <input type="hidden" name="id" value="@item.Id" />
+                                <button type="button" class="btn btn-outline-danger btn-sm"
+                                        onclick="cmsConfirmDelete(this.closest('form'), '«@item.NavigationText» wirklich löschen?')">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    </div>@* /cms-page-body *@
+</div>
+
+@* Modal Neu *@
+<div class="modal fade" id="modalCreate" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="post" asp-page-handler="Create">
+                <div class="modal-header"><h5 class="modal-title">Neuer Navigationseintrag</h5></div>
+                <div class="modal-body row g-2">
+                    <div class="col-6"><label class="form-label">Titel</label><input name="title" class="form-control" required /></div>
+                    <div class="col-6"><label class="form-label">Menütext</label><input name="navText" class="form-control" required /></div>
+                    <div class="col-6">
+                        <label class="form-label">Parent (leer = Top-Level)</label>
+                        <select name="parentId" class="form-select">
+                            <option value="">(Top-Level)</option>
+                            @foreach (var p in Model.Items.OrderBy(i => i.MenuOrder))
+                            {
+                                <option value="@p.Id">@p.NavigationText</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Widget</label>
+                        <select id="cWidget" name="widget" class="form-select" onchange="updateConfigField(this.value,'cConfig','cConfigLabel','cConfigHint')">
+                            <option value="">(keines)</option>
+                            @foreach (var w in Model.AvailableWidgets)
+                            {
+                                <option value="@w">@w</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label">Sichtbar für</label>
+                        <select name="visRole" class="form-select">
+                            <option value="">(alle)</option>
+                            @foreach (var r in Model.AvailableRoles) { <option value="@r" selected="@(r=="Member")">@r</option> }
+                        </select>
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label">Lesen</label>
+                        <select name="basicRole" class="form-select">
+                            <option value="">(alle)</option>
+                            @foreach (var r in Model.AvailableRoles) { <option value="@r" selected="@(r=="Member")">@r</option> }
+                        </select>
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label">Bearbeiten</label>
+                        <select name="extRole" class="form-select">
+                            <option value="">(alle)</option>
+                            @foreach (var r in Model.AvailableRoles) { <option value="@r" selected="@(r=="Administrator")">@r</option> }
+                        </select>
+                    </div>
+                    <div class="col-8">
+                        <label id="cConfigLabel" class="form-label">Config-String</label>
+                        <input id="cConfig" name="configStr" class="form-control" autocomplete="off"
+                               placeholder="–" disabled />
+                        <div id="cConfigHint" class="form-text text-muted"></div>
+                    </div>
+                    <div class="col-4"><label class="form-label">Reihenfolge</label><input name="menuOrder" type="number" class="form-control" value="10" /></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-cms">Erstellen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@* Modal Bearbeiten *@
+<div class="modal fade" id="modalEdit" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="post" asp-page-handler="Update">
+                <div class="modal-header"><h5 class="modal-title">Eintrag bearbeiten</h5></div>
+                <div class="modal-body row g-2">
+                    <input type="hidden" id="eId" name="id" />
+                    <div class="col-6"><label class="form-label">Titel</label><input id="eTitle" name="title" class="form-control" required /></div>
+                    <div class="col-6"><label class="form-label">Menütext</label><input id="eNavText" name="navText" class="form-control" required /></div>
+                    <div class="col-6">
+                        <label class="form-label">Parent</label>
+                        <select id="eParentId" name="parentId" class="form-select">
+                            <option value="">(Top-Level)</option>
+                            @foreach (var p in Model.Items.OrderBy(i => i.MenuOrder))
+                            {
+                                <option value="@p.Id">@p.NavigationText</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Widget</label>
+                        <select id="eWidget" name="widget" class="form-select" onchange="updateConfigField(this.value,'eConfig','eConfigLabel','eConfigHint')">
+                            <option value="">(keines)</option>
+                            @foreach (var w in Model.AvailableWidgets)
+                            {
+                                <option value="@w">@w</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label">Sichtbar für</label>
+                        <select id="eVisRole" name="visRole" class="form-select">
+                            <option value="">(alle)</option>
+                            @foreach (var r in Model.AvailableRoles) { <option value="@r">@r</option> }
+                        </select>
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label">Lesen</label>
+                        <select id="eBasicRole" name="basicRole" class="form-select">
+                            <option value="">(alle)</option>
+                            @foreach (var r in Model.AvailableRoles) { <option value="@r">@r</option> }
+                        </select>
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label">Bearbeiten</label>
+                        <select id="eExtRole" name="extRole" class="form-select">
+                            <option value="">(alle)</option>
+                            @foreach (var r in Model.AvailableRoles) { <option value="@r">@r</option> }
+                        </select>
+                    </div>
+                    <div class="col-8">
+                        <label id="eConfigLabel" class="form-label">Config-String</label>
+                        <input id="eConfig" name="configStr" class="form-control" autocomplete="off"
+                               placeholder="–" disabled />
+                        <div id="eConfigHint" class="form-text text-muted"></div>
+                    </div>
+                    <div class="col-4"><label class="form-label">Reihenfolge</label><input id="eOrder" name="menuOrder" type="number" class="form-control" /></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-cms">Speichern</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@* Shared datalists *@
+<datalist id="gruppenOptions">
+    @foreach (var g in Model.AvailableGruppen) { <option value="@g" /> }
+</datalist>
+<datalist id="pendenzenOptions">
+    <option value="*" />
+    @foreach (var u in Model.AvailableUsernames) { <option value="@u" /> }
+</datalist>
+
+@section Scripts {
+<script>
+// Widget → Config-String-Typ
+const WIDGET_TYPES = {
+    'wToDo':     'gruppe',
+    'wMeetings': 'gruppe',
+    'wDownloads':'gruppe',
+    'wVault':    'gruppe',
+    'wPendenzen':'pendenzen',
+};
+
+const CONFIG_META = {
+    'gruppe':    { label: 'Config-String (Gruppe)',    list: 'gruppenOptions',   placeholder: 'Gruppe wählen oder leer lassen', hint: '' },
+    'pendenzen': { label: 'Config-String (Pendenzen)', list: 'pendenzenOptions', placeholder: '* oder Username (leer = persönlich)', hint: '' },
+    'none':      { label: 'Config-String',             list: null,               placeholder: '–', hint: 'Wird von diesem Widget nicht verwendet.' },
+};
+
+function updateConfigField(widgetVal, inputId, labelId, hintId) {
+    const type = WIDGET_TYPES[widgetVal] || 'none';
+    const meta = CONFIG_META[type];
+    const input = document.getElementById(inputId);
+    const label = document.getElementById(labelId);
+    const hint  = document.getElementById(hintId);
+
+    label.textContent = meta.label;
+    hint.textContent  = meta.hint;
+    input.placeholder = meta.placeholder;
+
+    if (meta.list) {
+        input.setAttribute('list', meta.list);
+        input.removeAttribute('disabled');
+        input.classList.remove('text-muted');
+    } else {
+        input.removeAttribute('list');
+        input.setAttribute('disabled', 'disabled');
+        input.value = '';
+        input.classList.add('text-muted');
+    }
+}
+
+function openEdit(id,parentId,title,navText,visRole,basicRole,extRole,widget,configStr,menuOrder) {
+    document.getElementById('eId').value = id;
+    document.getElementById('eTitle').value = title;
+    document.getElementById('eNavText').value = navText;
+    document.getElementById('eParentId').value = parentId === 'null' ? '' : parentId;
+    const eWidget = document.getElementById('eWidget');
+    eWidget.value = widget;
+    if (!eWidget.value) eWidget.value = '';
+    document.getElementById('eVisRole').value = visRole;
+    document.getElementById('eBasicRole').value = basicRole;
+    document.getElementById('eExtRole').value = extRole;
+    // Config-Feld zuerst konfigurieren, dann Wert setzen
+    updateConfigField(widget, 'eConfig', 'eConfigLabel', 'eConfigHint');
+    document.getElementById('eConfig').value = configStr;
+    document.getElementById('eOrder').value = menuOrder;
+    new bootstrap.Modal(document.getElementById('modalEdit')).show();
+}
+</script>
+}

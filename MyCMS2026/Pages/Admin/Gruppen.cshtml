@@ -1,0 +1,86 @@
+@page
+@model MyCMS2026.Pages.Admin.GruppenModel
+@{
+    ViewData["Title"] = "Gruppen verwalten";
+}
+
+<div class="cms-page-header d-flex justify-content-between align-items-center">
+    <h1 class="cms-page-title">
+        <i class="bi bi-collection me-2 fs-4"></i>Gruppen verwalten
+    </h1>
+    <a asp-page="/Admin/Index" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Admin
+    </a>
+</div>
+
+<div class="cms-page-body" style="max-width:600px">
+
+    @if (!string.IsNullOrEmpty(Model.Message))
+    {
+        <div class="alert @(Model.IsError ? "alert-danger" : "alert-success") alert-dismissible fade show" role="alert">
+            @Model.Message
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <p class="text-muted mb-4">
+        Gruppen werden als <strong>Config String</strong> in Nav-Einträgen (wToDo / wMeetings) verwendet
+        und in jedem Todo / Meeting gespeichert. Sie dienen zur Filterung in Widgets und Weekly Mails.<br />
+        <em>Hinweis: Spezielle Config Strings wie Benutzernamen (Pendenzen) oder HTML werden hier nicht eingetragen.</em>
+    </p>
+
+    @* Neue Gruppe hinzufügen *@
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="fw-semibold mb-3"><i class="bi bi-plus-circle me-2 text-cms-blue"></i>Neue Gruppe</h5>
+            <form method="post" asp-page-handler="Add" class="row g-2 align-items-end">
+                <div class="col">
+                    <input type="text" name="name" class="form-control"
+                           placeholder="Gruppenname, z.B. Team1" maxlength="50" required />
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-cms">
+                        <i class="bi bi-plus-lg me-1"></i>Hinzufügen
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    @* Bestehende Gruppen *@
+    @* Lösch-Formulare ausserhalb der Tabelle *@
+    @foreach (var g in Model.Gruppen)
+    {
+        <form id="delGruppe-@g.GetHashCode()" method="post" asp-page-handler="Delete" style="display:none">
+            <input type="hidden" name="name" value="@g" />
+        </form>
+    }
+
+    <div class="card">
+        <div class="card-body p-0">
+            @if (!Model.Gruppen.Any())
+            {
+                <p class="text-muted text-center py-4 mb-0">Noch keine Gruppen definiert.</p>
+            }
+            else
+            {
+                <ul class="list-group list-group-flush">
+                    @foreach (var g in Model.Gruppen)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>
+                                <i class="bi bi-collection me-2 text-muted"></i>
+                                <strong>@g</strong>
+                            </span>
+                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                    onclick="cmsConfirmDelete('delGruppe-@g.GetHashCode()', 'Gruppe &quot;@g&quot; löschen?')">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
+
+</div>

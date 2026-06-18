@@ -1,0 +1,146 @@
+@page
+@model MyCMS2026.Pages.Meetings.MeetingDetailModel
+@{
+    ViewData["Title"] = Model.Meeting?.Thema ?? "Meeting";
+    var m = Model.Meeting!;
+    var isAdmin = User.IsInRole("Administrator");
+    var badgeClass = m.Status switch
+    {
+        "Abgeschlossen" => "badge-abgeschlossen",
+        "Abgesagt"      => "badge-abgesagt",
+        _               => "badge-geplant"
+    };
+}
+
+@if (Model.Meeting == null)
+{
+    <div class="cms-page-header">
+        <h1 class="cms-page-title">Meeting nicht gefunden</h1>
+    </div>
+    <div class="cms-page-body">
+        <div class="alert alert-warning">Meeting nicht gefunden.</div>
+        <a asp-page="Index" class="btn btn-cms">Zurück</a>
+    </div>
+}
+else
+{
+    <div class="cms-page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h1 class="cms-page-title">
+            @m.Thema <span class="badge bg-secondary fs-6 fw-normal ms-2">#@m.MeetingNr</span>
+        </h1>
+        <div class="d-flex gap-2">
+            @if (!string.IsNullOrEmpty(Model.ReturnPageId))
+            {
+                <a asp-page="/Page/Index" asp-route-id="@Model.ReturnPageId" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-left me-1"></i>Zurück
+                </a>
+            }
+            else
+            {
+                <a asp-page="Index" asp-route-gruppe="@Model.Gruppe" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-left me-1"></i>Zurück
+                </a>
+            }
+            @if (isAdmin)
+            {
+                <a asp-page="Edit" asp-route-id="@m.Id" asp-route-gruppe="@Model.Gruppe"
+                   asp-route-returnPageId="@Model.ReturnPageId" class="btn btn-cms btn-sm">
+                    <i class="bi bi-pencil me-1"></i>Bearbeiten
+                </a>
+            }
+        </div>
+    </div>
+    <div class="cms-page-body">
+
+        <div class="row g-3 mb-4">
+            <div class="col-sm-6 col-md-3">
+                <div class="card p-3 text-center">
+                    <div class="text-muted small">Datum</div>
+                    <div class="fw-semibold">@m.Datum.ToString("dd. MMMM yyyy")</div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <div class="card p-3 text-center">
+                    <div class="text-muted small">Leitung</div>
+                    <div class="fw-semibold">@(string.IsNullOrEmpty(m.Leitung) ? "–" : m.Leitung)</div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <div class="card p-3 text-center">
+                    <div class="text-muted small">Status</div>
+                    <div><span class="badge @badgeClass">@m.Status</span></div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <div class="card p-3 text-center">
+                    <div class="text-muted small">Klasse / Gruppe</div>
+                    <div class="fw-semibold">
+                        @if (!string.IsNullOrEmpty(m.Klasse))
+                        {
+                            <span class="badge bg-light text-dark border me-1">@m.Klasse</span>
+                        }
+                        @if (!string.IsNullOrEmpty(m.Gruppe))
+                        {
+                            <span class="badge bg-secondary">@m.Gruppe</span>
+                        }
+                        @if (string.IsNullOrEmpty(m.Klasse) && string.IsNullOrEmpty(m.Gruppe))
+                        {
+                            <span>–</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(m.Beschreibung))
+        {
+            <div class="card mb-4">
+                <div class="card-header-cms">Beschreibung</div>
+                <div class="card-body">@m.Beschreibung</div>
+            </div>
+        }
+
+        @if (m.ContentType == "Text" && !string.IsNullOrWhiteSpace(m.Content))
+        {
+            <div class="card mb-4">
+                <div class="card-header-cms">Inhalt</div>
+                <div class="card-body">@Html.Raw(m.Content)</div>
+            </div>
+        }
+
+        @if (m.Files.Any())
+        {
+            <div class="card mb-4">
+                <div class="card-header-cms"><i class="bi bi-paperclip me-2"></i>Dateien (@m.Files.Count)</div>
+                <div class="card-body">
+                    @foreach (var f in m.Files)
+                    {
+                        var ext = System.IO.Path.GetExtension(f.OriginalName).ToLowerInvariant();
+                        string icon;
+                        if (ext == ".pdf") icon = "bi-file-pdf text-danger";
+                        else if (ext == ".docx" || ext == ".doc") icon = "bi-file-word text-primary";
+                        else if (ext == ".xlsx" || ext == ".xls") icon = "bi-file-excel text-success";
+                        else if (ext == ".pptx" || ext == ".ppt") icon = "bi-file-ppt text-warning";
+                        else if (ext is ".jpg" or ".jpeg" or ".png" or ".gif") icon = "bi-file-image text-info";
+                        else icon = "bi-file-earmark";
+                        <div class="file-item">
+                            <i class="bi @icon fs-5"></i>
+                            <a asp-page="/Meetings/File" asp-route-id="@m.Id" asp-route-fileId="@f.Id"
+                               class="text-decoration-none flex-grow-1">@f.OriginalName</a>
+                            <span class="text-muted small">@(f.Size / 1024) KB</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <div class="text-muted small mt-3">
+            Erstellt: @m.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+            @if (!string.IsNullOrEmpty(m.CreatedBy)) { <span>von @m.CreatedBy</span> }
+            &nbsp;|&nbsp;
+            Geändert: @m.UpdatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+            @if (!string.IsNullOrEmpty(m.UpdatedBy)) { <span>von @m.UpdatedBy</span> }
+        </div>
+
+    </div>
+}

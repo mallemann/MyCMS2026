@@ -1,0 +1,555 @@
+@page "{id}"
+@model MyCMS2026.Pages.Projects.ProjectDetailModel
+@inject MyCMS2026.Services.TodoService TodoSvcView
+@inject MyCMS2026.Services.MeetingService MeetingSvcView
+@{
+    ViewData["Title"] = Model.Project.Name;
+    var p   = Model.Project;
+    var tab = Model.ActiveTab ?? "journal";
+
+    // Rotierende Akzentfarben für Journaleinträge
+    var jAccents = new[] {
+        ("#4361ee", "rgba(67,97,238,.07)"),    // Indigo
+        ("#0d9488", "rgba(13,148,136,.07)"),   // Teal
+        ("#7c3aed", "rgba(124,58,237,.07)"),   // Violett
+        ("#d97706", "rgba(217,119,6,.07)"),    // Amber
+        ("#0284c7", "rgba(2,132,199,.07)"),    // Sky
+    };
+    int jIdx = 0;
+}
+
+<div>
+    <div class="cms-page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h1 class="cms-page-title mb-0">
+                <i class="bi bi-kanban me-2"></i>@p.Name
+            </h1>
+            <div class="mt-1">
+                <span class="badge @(p.Status == "Aktiv" ? "bg-success" : p.Status == "Pausiert" ? "bg-warning text-dark" : "bg-secondary")">
+                    @p.Status
+                </span>
+                @if (!string.IsNullOrEmpty(p.Projektleiter))
+                {
+                    <span class="text-muted small ms-2"><i class="bi bi-person me-1"></i>@p.Projektleiter</span>
+                }
+                @if (p.StartDatum.HasValue || p.EndDatum.HasValue)
+                {
+                    <span class="text-muted small ms-3">
+                        <i class="bi bi-calendar me-1"></i>
+                        @(p.StartDatum?.ToString("dd.MM.yyyy") ?? "–") – @(p.EndDatum?.ToString("dd.MM.yyyy") ?? "–")
+                    </span>
+                }
+            </div>
+        </div>
+        <div class="d-flex gap-2">
+            <a asp-page="Index" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i>Projekte
+            </a>
+            @if (Model.IsAdmin)
+            {
+                <a asp-page="Edit" asp-route-id="@p.Id" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-pencil me-1"></i>Bearbeiten
+                </a>
+            }
+        </div>
+    </div>
+
+    <div class="cms-page-body pt-3">
+    @if (!string.IsNullOrEmpty(p.Beschreibung))
+    {
+        <div class="alert alert-light border-start border-4 border-primary mb-3 px-3 py-2 small">
+            @p.Beschreibung
+        </div>
+    }
+
+        @* Tabs *@
+        <ul class="nav nav-tabs mb-3">
+            <li class="nav-item">
+                <a class="nav-link @(tab == "journal" ? "active" : "")"
+                   asp-page="Detail" asp-route-id="@p.Id" asp-route-tab="journal">
+                    <i class="bi bi-journal-text me-1"></i>Journal
+                    @if (p.Journal.Any())
+                    {
+                        <span class="badge bg-secondary ms-1">@p.Journal.Count</span>
+                    }
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link @(tab == "todos" ? "active" : "")"
+                   asp-page="Detail" asp-route-id="@p.Id" asp-route-tab="todos">
+                    <i class="bi bi-check2-square me-1"></i>Aufgaben
+                    @if (Model.Todos.Any())
+                    {
+                        <span class="badge bg-secondary ms-1">@Model.Todos.Count</span>
+                    }
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link @(tab == "meetings" ? "active" : "")"
+                   asp-page="Detail" asp-route-id="@p.Id" asp-route-tab="meetings">
+                    <i class="bi bi-calendar-event me-1"></i>Sitzungen
+                    @if (Model.Meetings.Any())
+                    {
+                        <span class="badge bg-secondary ms-1">@Model.Meetings.Count</span>
+                    }
+                </a>
+            </li>
+        </ul>
+
+        @* ─── JOURNAL TAB ───────────────────────────────────────────────── *@
+        @if (tab == "journal")
+        {
+            @if (Model.CanEdit)
+            {
+                <div class="d-flex justify-content-end mb-3">
+                    <button type="button" class="btn btn-cms btn-sm"
+                            data-bs-toggle="collapse" data-bs-target="#newJournalPanel">
+                        <i class="bi bi-plus-circle me-1"></i>Neuer Journaleintrag
+                    </button>
+                </div>
+                <div class="collapse mb-4" id="newJournalPanel">
+                    <div class="card">
+                        <div class="card-header card-header-cms">
+                            <i class="bi bi-journal-plus me-1"></i>Neuer Journaleintrag
+                        </div>
+                        <div class="card-body">
+                            <form method="post" asp-page-handler="AddJournal">
+                                <input type="hidden" name="id" value="@p.Id" />
+                                <div class="mb-2">
+                                    <input type="text" name="titel" class="form-control" placeholder="Titel..." required />
+                                </div>
+                                <div class="mb-2">
+                                    <textarea id="newJournalContent" name="content" class="form-control" rows="5"></textarea>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-cms btn-sm">
+                                        <i class="bi bi-check-lg me-1"></i>Speichern
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm"
+                                            data-bs-toggle="collapse" data-bs-target="#newJournalPanel">
+                                        Abbrechen
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @if (!p.Journal.Any())
+            {
+                <div class="text-center py-4 text-muted">
+                    <i class="bi bi-journal fs-1 d-block mb-2"></i>
+                    Noch keine Journaleinträge vorhanden.
+                </div>
+            }
+            else
+            {
+                @foreach (var entry in p.Journal.OrderByDescending(e => e.CreatedAt))
+                {
+                    var (accent, bgTint) = jAccents[jIdx % jAccents.Length];
+                    jIdx++;
+
+                    <div class="card mb-3 border-0 shadow-sm" id="entry-@entry.Id"
+                         style="border-left: 4px solid @accent !important;">
+
+                        @* Header *@
+                        <div class="card-header d-flex justify-content-between align-items-start gap-2 py-2 px-3"
+                             style="background: @bgTint; border-bottom: 1px solid rgba(0,0,0,.06);">
+                            <div class="flex-fill min-w-0">
+                                <div class="fw-bold" style="color: @accent;">@entry.Titel</div>
+                                <div class="small text-muted mt-1">
+                                    <i class="bi bi-person me-1"></i>@entry.CreatedBy
+                                    @if (entry.UpdatedAt > entry.CreatedAt.AddMinutes(1))
+                                    {
+                                        <span class="ms-3 fst-italic">bearbeitet @entry.UpdatedAt.ToLocalTime().ToString("dd.MM.yy HH:mm")</span>
+                                    }
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                <div class="text-end">
+                                    <div class="fw-semibold small" style="color:@accent;">
+                                        @entry.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")
+                                    </div>
+                                    <div class="text-muted" style="font-size:.75rem;">
+                                        @entry.CreatedAt.ToLocalTime().ToString("HH:mm")
+                                    </div>
+                                </div>
+                                @if (Model.CanEdit)
+                                {
+                                    <div class="d-flex gap-1">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                                onclick="projToggleEdit('@entry.Id')" title="Bearbeiten">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <form id="delJournal-@entry.Id" method="post" asp-page-handler="DeleteJournal" style="display:none">
+                                            <input type="hidden" name="id" value="@p.Id" />
+                                            <input type="hidden" name="entryId" value="@entry.Id" />
+                                        </form>
+                                        <button type="button" class="btn btn-sm btn-outline-danger"
+                                                onclick="cmsConfirmDelete('delJournal-@entry.Id', 'Journaleintrag «@entry.Titel.Replace("'", "\\'")» löschen?')"
+                                                title="Löschen">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        @* View mode *@
+                        <div id="view-@entry.Id" class="card-body px-3 py-3">
+                            <div class="journal-content">@Html.Raw(entry.Content)</div>
+                        </div>
+
+                        @* Edit mode *@
+                        @if (Model.CanEdit)
+                        {
+                            <div id="edit-@entry.Id" class="card-body border-top px-3 py-3 d-none">
+                                <form method="post" asp-page-handler="UpdateJournal">
+                                    <input type="hidden" name="id" value="@p.Id" />
+                                    <input type="hidden" name="entryId" value="@entry.Id" />
+                                    <div class="mb-2">
+                                        <input type="text" name="titel" value="@entry.Titel" class="form-control" required />
+                                    </div>
+                                    <div class="mb-2">
+                                        <textarea id="editContent-@entry.Id" name="content" class="form-control" rows="5">@entry.Content</textarea>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <button type="submit" class="btn btn-cms btn-sm">
+                                            <i class="bi bi-check-lg me-1"></i>Speichern
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm"
+                                                onclick="projToggleEdit('@entry.Id')">
+                                            Abbrechen
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        }
+
+                        @* Comments *@
+                        @if (entry.Comments.Any() || Model.CanComment)
+                        {
+                        <div class="card-footer py-2 px-3" style="background:rgba(0,0,0,.02);">
+                            @foreach (var comment in entry.Comments)
+                            {
+                                <div class="d-flex justify-content-between align-items-start mb-2 pb-2 border-bottom">
+                                    <div>
+                                        <div class="small">@comment.Text</div>
+                                        <div class="text-muted" style="font-size:.75rem">
+                                            <i class="bi bi-person me-1"></i>@comment.CreatedBy
+                                            <span class="ms-1">@comment.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>
+                                        </div>
+                                    </div>
+                                    @if (Model.CanEdit)
+                                    {
+                                        <form method="post" asp-page-handler="DeleteComment">
+                                            <input type="hidden" name="id" value="@p.Id" />
+                                            <input type="hidden" name="entryId" value="@entry.Id" />
+                                            <input type="hidden" name="commentId" value="@comment.Id" />
+                                            <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2"
+                                                    onclick="cmsConfirmDelete(this.closest('form'), 'Kommentar löschen?')">
+                                                <i class="bi bi-x-circle"></i>
+                                            </button>
+                                        </form>
+                                    }
+                                </div>
+                            }
+                            @if (Model.CanComment)
+                            {
+                                <form method="post" asp-page-handler="AddComment" class="d-flex gap-2 mt-1">
+                                    <input type="hidden" name="id" value="@p.Id" />
+                                    <input type="hidden" name="entryId" value="@entry.Id" />
+                                    <input type="text" name="text" class="form-control form-control-sm"
+                                           placeholder="Kommentar hinzufügen..." required />
+                                    <button type="submit" class="btn btn-outline-secondary btn-sm flex-shrink-0">
+                                        <i class="bi bi-send"></i>
+                                    </button>
+                                </form>
+                            }
+                        </div>
+                        }@* /if comments || canComment *@
+                    </div>
+                }
+            }
+        }
+
+        @* ─── AUFGABEN TAB ──────────────────────────────────────────────── *@
+        @if (tab == "todos")
+        {
+            <div class="d-flex justify-content-end mb-3 gap-2">
+                @if (Model.CanEdit)
+                {
+                    <button type="button" class="btn btn-outline-secondary btn-sm"
+                            data-bs-toggle="collapse" data-bs-target="#assignTodoPanel">
+                        <i class="bi bi-link me-1"></i>Bestehende Aufgabe zuordnen
+                    </button>
+                    <a asp-page="/Todos/Edit" asp-route-projectId="@p.Id" class="btn btn-cms btn-sm">
+                        <i class="bi bi-plus-circle me-1"></i>Neue Aufgabe
+                    </a>
+                }
+            </div>
+
+            @if (Model.CanEdit)
+            {
+                <div class="collapse mb-3" id="assignTodoPanel">
+                    @{
+                        var allTodos = await TodoSvcView.GetAllAsync();
+                        var unassigned = allTodos.Where(t => string.IsNullOrEmpty(t.ProjectId)).ToList();
+                    }
+                    @if (unassigned.Any())
+                    {
+                        <div class="card">
+                            <div class="card-body py-2">
+                                <form method="post" asp-page-handler="AssignTodo" class="d-flex gap-2">
+                                    <input type="hidden" name="id" value="@p.Id" />
+                                    <select name="todoId" class="form-select form-select-sm flex-fill">
+                                        @foreach (var t in unassigned.OrderBy(t => t.Thema))
+                                        {
+                                            <option value="@t.Id">#@t.TaskNr – @t.Thema @(t.Erledigt ? "✓" : "")</option>
+                                        }
+                                    </select>
+                                    <button type="submit" class="btn btn-outline-primary btn-sm flex-shrink-0">
+                                        <i class="bi bi-link me-1"></i>Zuordnen
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-info py-2 small">Keine nicht zugeordneten Aufgaben vorhanden.</div>
+                    }
+                </div>
+            }
+
+            @if (!Model.Todos.Any())
+            {
+                <div class="text-center py-4 text-muted">
+                    <i class="bi bi-check2-square fs-1 d-block mb-2"></i>
+                    Noch keine Aufgaben diesem Projekt zugeordnet.
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Thema</th>
+                                <th>Verantwortlich</th>
+                                <th>Bis</th>
+                                <th>Status</th>
+                                @if (Model.CanEdit) { <th></th> }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var t in Model.Todos.OrderBy(t => t.Erledigt).ThenBy(t => t.ErledigenBis))
+                            {
+                                <tr class="@(t.Erledigt ? "text-muted" : "")">
+                                    <td>@t.TaskNr</td>
+                                    <td>
+                                        <a asp-page="/Todos/Edit" asp-route-id="@t.Id">@t.Thema</a>
+                                    </td>
+                                    <td>@t.Verantwortlich</td>
+                                    <td>@t.ErledigenBis.ToString("dd.MM.yyyy")</td>
+                                    <td>
+                                        @if (t.Erledigt)
+                                        {
+                                            <span class="badge bg-success">Erledigt</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Offen</span>
+                                        }
+                                    </td>
+                                    @if (Model.CanEdit)
+                                    {
+                                        <td class="text-nowrap">
+                                            <a asp-page="/Todos/Edit" asp-route-id="@t.Id"
+                                               class="btn btn-sm btn-outline-secondary" title="Bearbeiten">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <form method="post" asp-page-handler="ToggleTodo" class="d-inline">
+                                                <input type="hidden" name="id" value="@p.Id" />
+                                                <input type="hidden" name="todoId" value="@t.Id" />
+                                                <button type="submit" class="btn btn-sm @(t.Erledigt ? "btn-success" : "btn-outline-success")"
+                                                        title="@(t.Erledigt ? "Als offen markieren" : "Als erledigt markieren")">
+                                                    <i class="bi bi-check-lg"></i>
+                                                </button>
+                                            </form>
+                                            <form method="post" asp-page-handler="RemoveTodo" class="d-inline">
+                                                <input type="hidden" name="id" value="@p.Id" />
+                                                <input type="hidden" name="todoId" value="@t.Id" />
+                                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                                        title="Aus Projekt entfernen"
+                                                        onclick="cmsConfirmDelete(this.closest('form'), 'Aufgabe «@t.Thema.Replace("'", "\\'")» aus Projekt entfernen (nicht löschen)?')">
+                                                    <i class="bi bi-x-circle"></i>
+                                                </button>
+                                            </form>
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+
+        @* ─── SITZUNGEN TAB ─────────────────────────────────────────────── *@
+        @if (tab == "meetings")
+        {
+            <div class="d-flex justify-content-end mb-3 gap-2">
+                @if (Model.CanEdit)
+                {
+                    <button type="button" class="btn btn-outline-secondary btn-sm"
+                            data-bs-toggle="collapse" data-bs-target="#assignMeetingPanel">
+                        <i class="bi bi-link me-1"></i>Bestehende Sitzung zuordnen
+                    </button>
+                    <a asp-page="/Meetings/Edit" asp-route-projectId="@p.Id" class="btn btn-cms btn-sm">
+                        <i class="bi bi-plus-circle me-1"></i>Neue Sitzung
+                    </a>
+                }
+            </div>
+
+            @if (Model.CanEdit)
+            {
+                <div class="collapse mb-3" id="assignMeetingPanel">
+                    @{
+                        var allMeetings = await MeetingSvcView.GetAllAsync();
+                        var unassignedM = allMeetings.Where(m => string.IsNullOrEmpty(m.ProjectId)).ToList();
+                    }
+                    @if (unassignedM.Any())
+                    {
+                        <div class="card">
+                            <div class="card-body py-2">
+                                <form method="post" asp-page-handler="AssignMeeting" class="d-flex gap-2">
+                                    <input type="hidden" name="id" value="@p.Id" />
+                                    <select name="meetingId" class="form-select form-select-sm flex-fill">
+                                        @foreach (var m in unassignedM.OrderByDescending(m => m.Datum))
+                                        {
+                                            <option value="@m.Id">#@m.MeetingNr – @m.Datum.ToString("dd.MM.yyyy") @m.Thema</option>
+                                        }
+                                    </select>
+                                    <button type="submit" class="btn btn-outline-primary btn-sm flex-shrink-0">
+                                        <i class="bi bi-link me-1"></i>Zuordnen
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-info py-2 small">Keine nicht zugeordneten Sitzungen vorhanden.</div>
+                    }
+                </div>
+            }
+
+            @if (!Model.Meetings.Any())
+            {
+                <div class="text-center py-4 text-muted">
+                    <i class="bi bi-calendar-event fs-1 d-block mb-2"></i>
+                    Noch keine Sitzungen diesem Projekt zugeordnet.
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Datum</th>
+                                <th>Thema</th>
+                                <th>Leitung</th>
+                                <th>Status</th>
+                                @if (Model.CanEdit) { <th></th> }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var m in Model.Meetings.OrderByDescending(m => m.Datum))
+                            {
+                                <tr>
+                                    <td>@m.MeetingNr</td>
+                                    <td>@m.Datum.ToString("dd.MM.yyyy")</td>
+                                    <td>
+                                        <a asp-page="/Meetings/Edit" asp-route-id="@m.Id">@m.Thema</a>
+                                    </td>
+                                    <td>@m.Leitung</td>
+                                    <td>
+                                        <span class="badge @(m.Status == "Abgeschlossen" ? "bg-success" : m.Status == "Abgesagt" ? "bg-danger" : "bg-secondary")">
+                                            @m.Status
+                                        </span>
+                                    </td>
+                                    @if (Model.CanEdit)
+                                    {
+                                        <td class="text-nowrap">
+                                            <a asp-page="/Meetings/Edit" asp-route-id="@m.Id"
+                                               class="btn btn-sm btn-outline-secondary" title="Bearbeiten">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <form method="post" asp-page-handler="RemoveMeeting" class="d-inline">
+                                                <input type="hidden" name="id" value="@p.Id" />
+                                                <input type="hidden" name="meetingId" value="@m.Id" />
+                                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                                        title="Aus Projekt entfernen"
+                                                        onclick="cmsConfirmDelete(this.closest('form'), 'Sitzung «@m.Thema.Replace("'", "\\'")» aus Projekt entfernen (nicht löschen)?')">
+                                                    <i class="bi bi-x-circle"></i>
+                                                </button>
+                                            </form>
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+
+    </div>@* /cms-page-body *@
+</div>
+
+@section Scripts {
+<script>
+function projToggleEdit(entryId) {
+    document.getElementById('view-' + entryId).classList.toggle('d-none');
+    document.getElementById('edit-' + entryId).classList.toggle('d-none');
+}
+</script>
+@if (Model.CanEdit)
+{
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/summernote/0.8.20/summernote-bs5.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/summernote/0.8.20/summernote-bs5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/summernote/0.8.20/lang/summernote-de-DE.min.js"></script>
+    <script>
+    $(document).ready(function () {
+        var snOpts = {
+            lang: 'de-DE',
+            height: 250,
+            toolbar: [
+                ['font',  ['bold', 'italic', 'underline', 'clear']],
+                ['para',  ['ul', 'ol']],
+                ['insert',['link', 'hr']],
+                ['view',  ['codeview']]
+            ]
+        };
+        $('#newJournalContent').summernote(snOpts);
+        $('textarea[id^="editContent-"]').each(function () {
+            $(this).summernote(snOpts);
+        });
+        $('form').on('submit', function () {
+            $(this).find('textarea[id^="editContent-"], #newJournalContent').each(function () {
+                if ($(this).data('summernote')) {
+                    $(this).val($(this).summernote('code'));
+                    $(this).show();
+                }
+            });
+        });
+    });
+    </script>
+}
+}

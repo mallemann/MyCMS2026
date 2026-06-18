@@ -1,0 +1,80 @@
+@page
+@model MyCMS2026.Pages.Admin.KlassenModel
+@{
+    ViewData["Title"] = "Klassen verwalten";
+
+    string TypeLabel(string t) => t switch
+    {
+        "todos"     => "ToDos",
+        "meetings"  => "Meetings",
+        "downloads" => "Downloads",
+        _           => t
+    };
+    string TypeSubtitle(string t) => t switch
+    {
+        "todos"     => "Widget: wToDo · Seite: Todos/Index",
+        "meetings"  => "Widget: wMeetings · Seite: Meetings/Index",
+        "downloads" => "Widget: wDownloads · Seite: Downloads/Index",
+        _           => t
+    };
+    string TypeIcon(string t) => t switch
+    {
+        "todos"     => "bi-check2-square",
+        "meetings"  => "bi-people",
+        "downloads" => "bi-file-earmark",
+        _           => "bi-tag"
+    };
+}
+
+<div class="cms-page-header d-flex justify-content-between align-items-center">
+    <h1 class="cms-page-title">
+        <i class="bi bi-tags me-2 fs-4"></i>Klassen verwalten
+    </h1>
+    <a asp-page="/Admin/Index" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Admin
+    </a>
+</div>
+
+<div class="cms-page-body">
+
+    @if (!string.IsNullOrEmpty(Model.Message))
+    {
+        <div class="alert @(Model.IsError ? "alert-danger" : "alert-success") alert-dismissible fade show" role="alert">
+            @Model.Message
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <p class="text-muted mb-4">
+        Jede Zeile ist eine Klasse. Reihenfolge bestimmt die Darstellung in den Dropdowns.
+    </p>
+
+    <div class="row g-4">
+        @foreach (var type in MyCMS2026.Services.KlassenService.Types)
+        {
+            var items = Model.AllKlassen.TryGetValue(type, out var l) ? l : new();
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <form method="post" asp-page-handler="Save">
+                            <input type="hidden" name="type" value="@type" />
+                            <h5 class="fw-semibold mb-0">
+                                <i class="bi @TypeIcon(type) me-2 text-cms-blue"></i>@TypeLabel(type)
+                            </h5>
+                            <p class="text-muted small mb-2">@TypeSubtitle(type)</p>
+                            <textarea name="klassen" class="form-control font-monospace" rows="10"
+                                      style="font-size:.875rem">@string.Join("\n", items)</textarea>
+                            <div class="d-flex justify-content-between align-items-center mt-2">
+                                <small class="text-muted">@items.Count Einträge</small>
+                                <button type="submit" class="btn btn-cms btn-sm">
+                                    <i class="bi bi-floppy me-1"></i>Speichern
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+</div>

@@ -1,0 +1,190 @@
+@page
+@model MyCMS2026.Pages.Admin.WeeklyMailModel
+@{
+    ViewData["Title"] = "Weekly Mail";
+}
+<div>
+    <div class="cms-page-header d-flex justify-content-between align-items-center">
+        <h1 class="cms-page-title"><i class="bi bi-envelope-paper me-2 fs-4"></i>Weekly Mail</h1>
+        <form method="post" asp-page-handler="SendNow" class="d-inline">
+            <button type="submit" class="btn btn-cms btn-sm">
+                <i class="bi bi-send me-1"></i>Jetzt senden
+            </button>
+        </form>
+    </div>
+    <div class="cms-page-body">
+
+    @if (!string.IsNullOrEmpty(Model.Message))
+    {
+        <div class="alert alert-@(Model.IsError ? "danger" : "success") alert-dismissible">
+            @Model.Message
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (Model.Config.LastSentAt.HasValue)
+    {
+        <p class="text-muted small"><i class="bi bi-clock me-1"></i>Zuletzt gesendet: @Model.Config.LastSentAt.Value.ToString("dd.MM.yyyy HH:mm")</p>
+    }
+
+    <form method="post" asp-page-handler="Save" id="frmConfig">
+        <div class="table-responsive">
+            <table class="table table-bordered table-sm align-middle" id="tblRecipients">
+                <thead class="table-light">
+                    <tr>
+                        <th>Benutzer</th>
+                        <th>E-Mail</th>
+                        <th class="text-center">Todos</th>
+                        <th class="text-center">Meetings</th>
+                        <th class="text-center">Journal</th>
+                        <th>Gruppen (Todos &amp; Meetings)</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @for (int i = 0; i < Model.Config.Recipients.Count; i++)
+                {
+                    var r = Model.Config.Recipients[i];
+                    <tr>
+                        <td>
+                            <select name="recipientUser" class="form-select form-select-sm" onchange="fillEmail(this, @i)">
+                                <option value="">– wählen –</option>
+                                @foreach (var u in Model.AllUsers)
+                                {
+                                    <option value="@u.UserName" data-email="@u.Email"
+                                            selected="@(u.UserName == r.UserId ? "selected" : null)">
+                                        @u.UserName
+                                    </option>
+                                }
+                            </select>
+                        </td>
+                        <td>
+                            <input name="recipientEmail" id="email_@i" class="form-control form-control-sm"
+                                   value="@r.Email" />
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="recipientTodos" value="@i" class="form-check-input"
+                                   @(r.ReceiveTodos ? "checked" : "") />
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="recipientMeetings" value="@i" class="form-check-input"
+                                   @(r.ReceiveMeetings ? "checked" : "") />
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="recipientJournal" value="@i" class="form-check-input"
+                                   @(r.ReceiveJournal ? "checked" : "") />
+                        </td>
+                        <td>
+                            <div class="d-flex flex-wrap gap-1">
+                                @foreach (var g in Model.AllGruppen)
+                                {
+                                    var checked_ = r.AllowedGruppen.Contains(g, StringComparer.OrdinalIgnoreCase);
+                                    <div class="form-check form-check-inline mb-0">
+                                        <input type="checkbox" class="form-check-input"
+                                               name="recipientGruppen" value="@i:@g"
+                                               id="g_@(i)_@g" @(checked_ ? "checked" : "") />
+                                        <label class="form-check-label small" for="g_@(i)_@g">@g</label>
+                                    </div>
+                                }
+                            </div>
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeRow(this)">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mb-3">
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addRow()">
+                <i class="bi bi-plus-lg me-1"></i>Empfänger hinzufügen
+            </button>
+        </div>
+
+        <button type="submit" class="btn btn-cms">
+            <i class="bi bi-floppy me-1"></i>Speichern
+        </button>
+        <a asp-page="/Admin/SiteConfig" class="btn btn-outline-secondary ms-2">Abbrechen</a>
+    </form>
+
+    </div>
+</div>
+
+@section Scripts {
+<script>
+// Alle User-Daten für Email-Autofill
+const allUsers = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+    Model.AllUsers.ToDictionary(u => u.UserName, u => u.Email)));
+
+// Alle Gruppen für neue Zeilen
+const allGruppen = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AllGruppen));
+
+function fillEmail(sel, idx) {
+    const email = allUsers[sel.value] || '';
+    const emailField = document.getElementById('email_' + idx);
+    if (emailField && emailField.value === '') emailField.value = email;
+}
+
+function removeRow(btn) {
+    btn.closest('tr').remove();
+    reindex();
+}
+
+function reindex() {
+    const rows = document.querySelectorAll('#tblRecipients tbody tr');
+    rows.forEach((row, i) => {
+        // Checkboxen value re-indexieren
+        row.querySelectorAll('input[name="recipientTodos"], input[name="recipientMeetings"], input[name="recipientJournal"]')
+           .forEach(cb => cb.value = i);
+        row.querySelectorAll('input[name="recipientGruppen"]').forEach(cb => {
+            const gruppe = cb.value.split(':').slice(1).join(':');
+            cb.value = `${i}:${gruppe}`;
+            cb.id = cb.id.replace(/g_\d+_/, `g_${i}_`);
+        });
+        row.querySelectorAll('label[for^="g_"]').forEach(lbl => {
+            lbl.setAttribute('for', lbl.getAttribute('for').replace(/g_\d+_/, `g_${i}_`));
+        });
+        row.querySelector('select[name="recipientUser"]').setAttribute('onchange', `fillEmail(this, ${i})`);
+        const emailId = `email_${i}`;
+        const emailField = row.querySelector('input[name="recipientEmail"]');
+        if (emailField) emailField.id = emailId;
+    });
+}
+
+function addRow() {
+    const tbody = document.querySelector('#tblRecipients tbody');
+    const i = tbody.querySelectorAll('tr').length;
+
+    const gruppenHtml = allGruppen.map(g =>
+        `<div class="form-check form-check-inline mb-0">
+           <input type="checkbox" class="form-check-input" name="recipientGruppen" value="${i}:${g}" id="g_${i}_${g}" />
+           <label class="form-check-label small" for="g_${i}_${g}">${g}</label>
+         </div>`
+    ).join('');
+
+    const userOptions = Object.keys(allUsers).map(u =>
+        `<option value="${u}" data-email="${allUsers[u]}">${u}</option>`
+    ).join('');
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td>
+            <select name="recipientUser" class="form-select form-select-sm" onchange="fillEmail(this, ${i})">
+                <option value="">– wählen –</option>
+                ${userOptions}
+            </select>
+        </td>
+        <td><input name="recipientEmail" id="email_${i}" class="form-control form-control-sm" /></td>
+        <td class="text-center"><input type="checkbox" name="recipientTodos" value="${i}" class="form-check-input" checked /></td>
+        <td class="text-center"><input type="checkbox" name="recipientMeetings" value="${i}" class="form-check-input" checked /></td>
+        <td class="text-center"><input type="checkbox" name="recipientJournal" value="${i}" class="form-check-input" checked /></td>
+        <td><div class="d-flex flex-wrap gap-1">${gruppenHtml}</div></td>
+        <td><button type="button" class="btn btn-outline-danger btn-sm" onclick="removeRow(this)"><i class="bi bi-trash"></i></button></td>`;
+    tbody.appendChild(tr);
+}
+</script>
+}

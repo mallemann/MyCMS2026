@@ -1,0 +1,221 @@
+@model MyCMS2026.Pages.Page.PageIndexModel
+@using MyCMS2026.Services
+@using MyCMS2026.Models
+@inject DownloadService DownloadSvc
+@inject MyCMS2026.Services.KlassenService KlassenSvc
+@{
+    var canEdit = Model.HasExtendedAccess;
+    var gruppe  = Model.NavItem?.ConfigString ?? "";
+    var pageId  = Model.Id;
+    var dlKlassen = await KlassenSvc.GetKlassenAsync("downloads");
+
+    // Filter aus Query-String
+    var search = Context.Request.Query["search"].ToString();
+    var klasse = Context.Request.Query["klasse"].ToString();
+
+    var all = await DownloadSvc.GetAllAsync();
+    if (!string.IsNullOrWhiteSpace(gruppe))
+        all = all.Where(d => d.Gruppe == gruppe).ToList();
+    if (!string.IsNullOrWhiteSpace(search))
+        all = all.Where(d => d.Beschreibung.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                              d.OriginalName.Contains(search, StringComparison.OrdinalIgnoreCase)).ToList();
+    if (!string.IsNullOrWhiteSpace(klasse))
+        all = all.Where(d => d.Klasse == klasse).ToList();
+}
+
+@* Upload-Modal (nur für canEdit) *@
+@if (canEdit)
+{
+    <div class="modal fade" id="wDlUploadModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="post" asp-page="/Downloads/Index" asp-page-handler="Upload" enctype="multipart/form-data">
+                    <input type="hidden" name="gruppe" value="@gruppe" />
+                    <input type="hidden" name="navItemId" value="@pageId" />
+                    <div class="modal-header card-header-cms rounded-0">
+                        <h5 class="modal-title text-white"><i class="bi bi-upload me-2"></i>Datei hochladen</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Datei <span class="text-danger">*</span></label>
+                            <input type="file" name="uploadFile" class="form-control" required />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Beschreibung</label>
+                            <input name="beschreibung" class="form-control" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Klasse</label>
+                            <select name="klasse" class="form-select">
+                                <option value="">– keine –</option>
+                                @foreach (var k in dlKlassen)
+                                {
+                                    <option value="@k">@k</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                        <button type="submit" class="btn btn-cms"><i class="bi bi-upload me-1"></i>Hochladen</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    @* Edit-Modal *@
+    <div class="modal fade" id="wDlEditModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="post" asp-page="/Downloads/Index" asp-page-handler="Update">
+                    <input type="hidden" name="gruppe" value="@gruppe" />
+                    <input type="hidden" name="navItemId" value="@pageId" />
+                    <input type="hidden" name="id" id="wDlEditId" />
+                    <div class="modal-header card-header-cms rounded-0">
+                        <h5 class="modal-title text-white"><i class="bi bi-pencil me-2"></i>Download bearbeiten</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Beschreibung</label>
+                            <input name="beschreibung" id="wDlEditBeschreibung" class="form-control" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Klasse</label>
+                            <select name="klasse" id="wDlEditKlasse" class="form-select">
+                                <option value="">– keine –</option>
+                                @foreach (var k in dlKlassen)
+                                {
+                                    <option value="@k">@k</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                        <button type="submit" class="btn btn-cms"><i class="bi bi-floppy me-1"></i>Speichern</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+    <span class="text-muted small">@all.Count Datei(en)</span>
+    @if (canEdit)
+    {
+        <button class="btn btn-cms btn-sm" data-bs-toggle="modal" data-bs-target="#wDlUploadModal">
+            <i class="bi bi-upload me-1"></i>Hochladen
+        </button>
+    }
+</div>
+
+<div class="cms-filter-bar mb-3">
+    <form method="get" class="row g-2 align-items-end">
+        <input type="hidden" name="Id" value="@pageId" />
+        <div class="col-sm-4 col-md-4">
+            <input type="text" name="search" value="@search" class="form-control form-control-sm" placeholder="Suchen..." />
+        </div>
+        <div class="col-sm-3 col-md-3">
+            <select name="klasse" class="form-select form-select-sm">
+                <option value="">Alle Klassen</option>
+                @foreach (var k in dlKlassen)
+                {
+                    <option value="@k" selected="@(klasse == k ? "selected" : null)">@k</option>
+                }
+            </select>
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-cms btn-sm"><i class="bi bi-funnel me-1"></i>Filter</button>
+            <a href="/Page/Index?Id=@pageId" class="btn btn-outline-secondary btn-sm ms-1">Reset</a>
+        </div>
+    </form>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-hover table-sm align-middle mb-0">
+        <thead>
+            <tr>
+                <th>Beschreibung</th>
+                <th>Dateiname</th>
+                <th>Klasse</th>
+                <th>Erstellt</th>
+                <th>Grösse</th>
+                <th class="text-end">Aktionen</th>
+            </tr>
+        </thead>
+        <tbody>
+@foreach (var d in all)
+{
+    var ext = System.IO.Path.GetExtension(d.OriginalName).ToLowerInvariant();
+    string icon;
+    if      (ext == ".pdf")                    icon = "bi-file-pdf text-danger";
+    else if (ext == ".docx" || ext == ".doc")  icon = "bi-file-word text-primary";
+    else if (ext == ".xlsx" || ext == ".xls")  icon = "bi-file-excel text-success";
+    else if (ext == ".pptx" || ext == ".ppt")  icon = "bi-file-ppt text-warning";
+    else                                       icon = "bi-file-earmark text-secondary";
+
+            <tr>
+                <td>@(string.IsNullOrEmpty(d.Beschreibung) ? "–" : d.Beschreibung)</td>
+                <td>
+                    <i class="bi @icon me-1"></i>
+                    <a asp-page="/Downloads/File" asp-route-storedName="@d.StoredName"
+                       class="text-decoration-none">@d.OriginalName</a>
+                </td>
+                <td>
+                    @if (!string.IsNullOrEmpty(d.Klasse))
+                    {
+                        <span class="badge bg-light text-dark border">@d.Klasse</span>
+                    }
+                </td>
+                <td class="text-muted small text-nowrap">@d.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")</td>
+                <td class="text-muted small text-nowrap">@(d.Size / 1024) KB</td>
+                <td class="text-end text-nowrap">
+                    <a asp-page="/Downloads/File" asp-route-storedName="@d.StoredName"
+                       class="btn btn-sm btn-outline-primary" title="Herunterladen">
+                        <i class="bi bi-download"></i>
+                    </a>
+                    @if (canEdit)
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary" title="Bearbeiten"
+                                onclick="wDlOpenEdit('@d.Id', '@d.Beschreibung.Replace("'", "\\'")', '@d.Klasse')">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <form method="post" asp-page="/Downloads/Index" asp-page-handler="Delete" class="d-inline">
+                            <input type="hidden" name="id" value="@d.Id" />
+                            <input type="hidden" name="gruppe" value="@gruppe" />
+                            <input type="hidden" name="navItemId" value="@pageId" />
+                            <button type="button" class="btn btn-sm btn-outline-danger" title="Löschen"
+                                    onclick="cmsConfirmDelete(this.closest('form'), '@d.OriginalName.Replace("'", "\\'") löschen?')">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    }
+                </td>
+            </tr>
+}
+            @if (!all.Any())
+            {
+                <tr><td colspan="6" class="text-center text-muted py-3">Keine Dateien vorhanden.</td></tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@if (canEdit)
+{
+    <script>
+    function wDlOpenEdit(id, beschreibung, klasse) {
+        document.getElementById('wDlEditId').value = id;
+        document.getElementById('wDlEditBeschreibung').value = beschreibung;
+        var sel = document.getElementById('wDlEditKlasse');
+        for (var i = 0; i < sel.options.length; i++) {
+            sel.options[i].selected = (sel.options[i].value === klasse);
+        }
+        new bootstrap.Modal(document.getElementById('wDlEditModal')).show();
+    }
+    </script>
+}

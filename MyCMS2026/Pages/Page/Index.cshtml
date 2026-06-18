@@ -1,0 +1,62 @@
+@page
+@model MyCMS2026.Pages.Page.PageIndexModel
+@{
+    ViewData["Title"] = Model.NavItem?.Title ?? "Seite";
+}
+
+@if (Model.NavItem == null)
+{
+    <div class="container mt-4">
+        <div class="alert alert-warning">Seite nicht gefunden.</div>
+    </div>
+}
+else if (!Model.HasAccess)
+{
+    <div class="container mt-4">
+        <div class="alert alert-danger">
+            <i class="bi bi-lock me-2"></i>Sie haben keinen Zugriff auf diese Seite.
+        </div>
+    </div>
+}
+else
+{
+    <div>
+        <div class="cms-page-header">
+            <h1 class="cms-page-title">@Model.NavItem.Title</h1>
+            @if (Model.HasExtendedAccess && !string.IsNullOrEmpty(Model.NavItem.Widget))
+            {
+                <span class="badge bg-secondary">
+                    <i class="bi bi-puzzle me-1"></i>@Model.NavItem.Widget
+                    @if (!string.IsNullOrEmpty(Model.NavItem.ConfigString))
+                    {
+                        <span class="ms-1 opacity-75" title="@Model.NavItem.ConfigString">· @Model.NavItem.ConfigString</span>
+                    }
+                </span>
+            }
+        </div>
+
+        @* Widget-Dispatcher: rendert das zum NavItem gehörende Partial *@
+        <div class="cms-page-body">
+        @if (!string.IsNullOrEmpty(Model.NavItem.Widget))
+        {
+            var partialName = $"~/Pages/Widgets/_{Model.NavItem.Widget}.cshtml";
+            try
+            {
+                @await Html.PartialAsync(partialName, Model)
+            }
+            catch
+            {
+                @* Widget-Partial existiert noch nicht → Platzhalter *@
+                @await Html.PartialAsync("~/Pages/Widgets/_wPlaceholder.cshtml", Model)
+            }
+        }
+        else
+        {
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i>
+                Dieser Navigationseintrag hat kein zugewiesenes Widget.
+            </div>
+        }
+        </div>
+    </div>
+}

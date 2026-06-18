@@ -1,0 +1,311 @@
+@model MyCMS2026.Pages.Page.PageIndexModel
+@inject MyCMS2026.Services.PendenzService PendenzSvc
+@*
+    Widget: wPendenzen — drei Modi via ConfigString:
+      ""   = Persönlich: zeigt nur Pendenzen des eingeloggten Benutzers (ConfigString="" + Verantwortlich=currentUser)
+      "*"  = Admin-Übersicht: alle Pendenzen aller Listen
+      "xyz"= Team-Liste: Pendenzen mit ConfigString="xyz" (bestehende Logik)
+*@
+
+@{
+    var rawConfig   = Model.NavItem?.ConfigString ?? "";
+    var currentUser = User.Identity?.Name ?? "";
+    var isAdmin     = User.IsInRole("Administrator");
+    var canEdit     = Model.HasExtendedAccess;
+    var navId       = Model.NavItem?.Id ?? "";
+
+    // Modus bestimmen
+    // ""           → persönliche Liste des eingeloggten Users
+    // "*"          → Admin-Übersicht: alle Pendenzen aller Users
+    // "Martin Allemann" → persönliche Liste dieses Users (Admin-Ansicht; Username kann Leerzeichen enthalten)
+    var isPersonal  = rawConfig == "";
+    var isAllMode   = rawConfig == "*";
+    var isUserMode  = !isPersonal && !isAllMode;
+    var targetUser  = rawConfig;
+
+    // Filter aus Query-String lesen
+    var filter = Context.Request.Query["filter"].ToString();
+    if (string.IsNullOrEmpty(filter)) filter = "unerledigt";
+
+    var erinnerung = Context.Request.Query["erinnerung"].ToString();
+    if (string.IsNullOrEmpty(erinnerung)) erinnerung = "ohne";
+
+    // Pendenzen laden je nach Modus
+    List<MyCMS2026.Models.Pendenz> alle;
+    if (isPersonal)
+        alle = await PendenzSvc.GetPersonalAsync(currentUser);
+    else if (isAllMode)
+        alle = await PendenzSvc.GetAllAsync();
+    else if (isUserMode)
+        alle = await PendenzSvc.GetPersonalAsync(targetUser);
+    else
+        alle = await PendenzSvc.GetPersonalAsync(currentUser); // Fallback: wie persönlich
+
+    var today = DateTime.Today;
+
+    // Erinnerungs-Filter
+    IEnumerable<MyCMS2026.Models.Pendenz> gefiltert = erinnerung switch
+    {
+        "nur" => alle.Where(p => p.IstErinnerung),
+        "mit" => alle,
+        _ => alle.Where(p => !p.IstErinnerung)  // "ohne" = Standard
+    };
+
+    // Status-Filter
+    gefiltert = filter switch
+    {
+        "erledigt"  => gefiltert.Where(p => p.Erledigt),
+        "meine"     => gefiltert.Where(p => !p.Erledigt && p.Verantwortlich == currentUser),
+        "ueberfaellig" => gefiltert.Where(p => !p.Erledigt && p.ErledigenBis.HasValue && p.ErledigenBis.Value.Date < today),
+        _           => gefiltert.Where(p => !p.Erledigt)  // "unerledigt" = Standard
+    };
+
+    var liste = gefiltert.OrderBy(p => p.Erledigt ? 1 : 0)
+                         .ThenBy(p => p.ErledigenBis ?? DateTime.MaxValue)
+                         .ThenBy(p => p.Nr)
+                         .ToList();
+
+    // Statistiken für Badges
+    var totalUnerledigt = alle.Count(p => !p.Erledigt && !p.IstErinnerung);
+    var totalUeberfaellig = alle.Count(p => !p.Erledigt && p.ErledigenBis.HasValue && p.ErledigenBis.Value.Date < today);
+    var totalMeine = alle.Count(p => !p.Erledigt && !p.IstErinnerung && p.Verantwortlich == currentUser);
+
+    // Hilfsfunktion: CSS-Klasse für Fälligkeit
+    string DueClass(MyCMS2026.Models.Pendenz p)
+    {
+        if (p.Erledigt) return "text-muted";
+        if (!p.ErledigenBis.HasValue) return "";
+        var diff = (p.ErledigenBis.Value.Date - today).TotalDays;
+        if (diff < 0) return "text-danger fw-semibold";   // überfällig
+        if (diff <= 7) return "text-warning fw-semibold"; // in 7 Tagen
+        return "text-muted";
+    }
+
+    // Kann der aktuelle User diese Pendenz bearbeiten?
+    bool CanEditItem(MyCMS2026.Models.Pendenz p) =>
+        canEdit || p.Verantwortlich == currentUser;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    @if (isPersonal)
+    {
+        <span class="badge bg-light text-secondary border fs-6 fw-normal px-2 py-1">
+            <i class="bi bi-person me-1"></i>@currentUser
+        </span>
+    }
+    else if (isAllMode)
+    {
+        <span class="badge bg-light text-secondary border fs-6 fw-normal px-2 py-1">
+            <i class="bi bi-people me-1"></i>Alle Benutzer
+        </span>
+    }
+    else if (isUserMode)
+    {
+        <span class="badge bg-light text-secondary border fs-6 fw-normal px-2 py-1">
+            <i class="bi bi-person-badge me-1"></i>@targetUser
+        </span>
+    }
+    @if (!isAllMode && !isUserMode)
+    {
+        <a asp-page="/Pendenzen/Edit"
+           asp-route-returnId="@navId"
+           asp-route-configString=""
+           class="btn btn-cms btn-sm">
+            <i class="bi bi-plus-lg me-1"></i>Neue Pendenz
+        </a>
+    }
+</div>
+
+<div class="cms-filter-bar d-flex flex-wrap gap-2">
+
+    @* Status-Filter *@
+    <div class="btn-group btn-group-sm" role="group">
+        <a href="?id=@navId&filter=unerledigt&erinnerung=@erinnerung"
+           class="btn @(filter == "unerledigt" ? "btn-cms" : "btn-outline-secondary")">
+            Unerledigte
+            @if (totalUnerledigt > 0)
+            {
+                <span class="badge bg-danger ms-1">@totalUnerledigt</span>
+            }
+        </a>
+        <a href="?id=@navId&filter=meine&erinnerung=@erinnerung"
+           class="btn @(filter == "meine" ? "btn-cms" : "btn-outline-secondary")">
+            Meine
+            @if (totalMeine > 0)
+            {
+                <span class="badge bg-white text-dark ms-1">@totalMeine</span>
+            }
+        </a>
+        <a href="?id=@navId&filter=ueberfaellig&erinnerung=@erinnerung"
+           class="btn @(filter == "ueberfaellig" ? "btn-danger" : "btn-outline-secondary")">
+            Überfällige
+            @if (totalUeberfaellig > 0)
+            {
+                <span class="badge bg-white text-danger ms-1">@totalUeberfaellig</span>
+            }
+        </a>
+        <a href="?id=@navId&filter=erledigt&erinnerung=@erinnerung"
+           class="btn @(filter == "erledigt" ? "btn-cms" : "btn-outline-secondary")">
+            Erledigte
+        </a>
+    </div>
+
+    @* Erinnerungs-Filter *@
+    <div class="btn-group btn-group-sm" role="group">
+        <a href="?id=@navId&filter=@filter&erinnerung=ohne"
+           class="btn @(erinnerung == "ohne" ? "btn-cms" : "btn-outline-secondary")">
+            <i class="bi bi-bell-slash me-1"></i>Ohne Erinnerungen
+        </a>
+        <a href="?id=@navId&filter=@filter&erinnerung=mit"
+           class="btn @(erinnerung == "mit" ? "btn-cms" : "btn-outline-secondary")">
+            Mit Erinnerungen
+        </a>
+        <a href="?id=@navId&filter=@filter&erinnerung=nur"
+           class="btn @(erinnerung == "nur" ? "btn-warning" : "btn-outline-secondary")">
+            <i class="bi bi-bell-fill me-1"></i>Nur Erinnerungen
+        </a>
+    </div>
+</div>
+
+@if (!liste.Any())
+{
+    <div class="alert alert-light border text-center py-4">
+        <i class="bi bi-check2-circle fs-3 text-success d-block mb-2"></i>
+        <span class="text-muted">Keine Einträge für diesen Filter.</span>
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th style="width:46px;">#</th>
+                    <th>Aufgabe</th>
+                    <th style="width:130px;">Verantwortlich</th>
+                    <th style="width:105px;">Fällig</th>
+                    <th style="width:100px;" class="text-center">Status</th>
+                    <th style="width:72px;" class="text-end"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in liste)
+                {
+                    var isOverdue = !p.Erledigt && p.ErledigenBis.HasValue && p.ErledigenBis.Value.Date < today;
+                    var isSoonDue = !p.Erledigt && !isOverdue && p.ErledigenBis.HasValue
+                                    && (p.ErledigenBis.Value.Date - today).TotalDays <= 7;
+                    var rowClass = p.Erledigt ? "pend-row-done"
+                                 : isOverdue   ? "pend-row-overdue"
+                                 : "";
+
+                    <tr class="@rowClass">
+                        <td class="text-muted small">
+                            @p.Nr
+                            @if (p.IstErinnerung)
+                            {
+                                <i class="bi bi-bell-fill text-warning ms-1" title="Erinnerung"></i>
+                            }
+                        </td>
+
+                        <td>
+                            <div class="@(p.Erledigt ? "text-decoration-line-through text-muted" : "fw-semibold")">
+                                @p.Text
+                            </div>
+                            @if (!string.IsNullOrEmpty(p.Nummer))
+                            {
+                                <small class="text-muted"><i class="bi bi-hash"></i>@p.Nummer</small>
+                            }
+                            @if (!string.IsNullOrEmpty(p.Extern))
+                            {
+                                <small class="text-muted ms-2"><i class="bi bi-person-lines-fill"></i> @p.Extern</small>
+                            }
+                        </td>
+
+                        <td class="small">
+                            @(string.IsNullOrEmpty(p.Verantwortlich) ? "–" : p.Verantwortlich)
+                        </td>
+
+                        <td class="small">
+                            @if (p.ErledigenBis.HasValue)
+                            {
+                                <span class="@(isOverdue ? "text-danger fw-semibold" : isSoonDue ? "text-warning fw-semibold" : "")">
+                                    @p.ErledigenBis.Value.ToString("dd.MM.yyyy")
+                                </span>
+                                @if (isOverdue)
+                                {
+                                    <br /><span class="badge pend-badge-overdue mt-1">@((int)(today - p.ErledigenBis.Value.Date).TotalDays)d überfällig</span>
+                                }
+                            }
+                            else
+                            {
+                                <span class="text-muted">–</span>
+                            }
+                        </td>
+
+                        <td class="text-center">
+                            @if (p.Erledigt)
+                            {
+                                <span class="badge pend-badge-done">Erledigt</span>
+                            }
+                            else if (isOverdue)
+                            {
+                                <span class="badge pend-badge-open">Überfällig</span>
+                            }
+                            else
+                            {
+                                <span class="badge pend-badge-open">Offen</span>
+                            }
+                        </td>
+
+                        <td class="text-end">
+                            <div class="d-flex gap-1 justify-content-end">
+                            <a asp-page="/Pendenzen/Detail"
+                               asp-route-id="@p.Id"
+                               asp-route-returnId="@navId"
+                               class="btn btn-sm btn-outline-primary pend-action-btn"
+                               title="Öffnen">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            @if (CanEditItem(p))
+                            {
+                                <form method="post" asp-page="/Pendenzen/Toggle">
+                                    <input type="hidden" name="id" value="@p.Id" />
+                                    <input type="hidden" name="returnId" value="@navId" />
+                                    <button type="submit"
+                                            class="btn btn-sm btn-outline-secondary pend-action-btn"
+                                            title="@(p.Erledigt ? "Erledigung zurücknehmen" : "Als erledigt markieren")">
+                                        <i class="bi bi-@(p.Erledigt ? "arrow-counterclockwise" : "check-lg")"></i>
+                                    </button>
+                                </form>
+                                <a asp-page="/Pendenzen/Edit"
+                                   asp-route-pendenzId="@p.Id"
+                                   asp-route-returnId="@navId"
+                                   class="btn btn-sm btn-outline-secondary pend-action-btn"
+                                   title="Bearbeiten">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                @if (isAdmin || (p.Erledigt && p.Verantwortlich == currentUser))
+                                {
+                                    <form method="post" asp-page="/Pendenzen/Delete">
+                                        <input type="hidden" name="id" value="@p.Id" />
+                                        <input type="hidden" name="returnId" value="@navId" />
+                                        <button type="button" class="btn btn-sm btn-outline-danger pend-action-btn"
+                                                title="Löschen"
+                                                onclick="cmsConfirmDelete(this.closest('form'), 'Pendenz #@p.Nr wirklich löschen?')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                }
+                            }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="text-muted small mt-2 px-1">
+        @liste.Count @(liste.Count == 1 ? "Eintrag" : "Einträge") angezeigt
+    </div>
+}

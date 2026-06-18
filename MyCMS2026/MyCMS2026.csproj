@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>MyCMS2026</RootNamespace>
+    <AssemblyName>MyCMS2026</AssemblyName>
+    <AspNetCoreHostingModel>OutOfProcess</AspNetCoreHostingModel>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
+    <PackageReference Include="MailKit" Version="4.16.0" />
+    <PackageReference Include="MimeKit" Version="4.16.0" />
+  </ItemGroup>
+
+</Project>

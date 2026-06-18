@@ -1,0 +1,112 @@
+@model MyCMS2026.Pages.Page.PageIndexModel
+@inject MyCMS2026.Services.UserService UserSvc
+@inject MyCMS2026.Services.NavigationService NavSvc
+
+@{
+    var users = await UserSvc.GetAllAsync();
+    var navItems = await NavSvc.GetAllAsync();
+}
+
+<div class="row g-3 mt-1">
+
+    <div class="col-12">
+        <h6 class="text-muted text-uppercase small mb-2">Schnellzugriff</h6>
+        <div class="d-flex flex-wrap gap-2">
+            <a asp-page="/Admin/Users" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-people me-1"></i>Benutzer verwalten
+            </a>
+            <a asp-page="/Admin/Navigation" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-list-nested me-1"></i>Navigation verwalten
+            </a>
+            <a asp-page="/Admin/SiteConfig" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-sliders me-1"></i>Site-Konfiguration
+            </a>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center gap-3">
+                    <i class="bi bi-people-fill text-primary" style="font-size:2rem;"></i>
+                    <div>
+                        <div class="fs-3 fw-bold">@users.Count</div>
+                        <div class="text-muted small">Benutzer total</div>
+                    </div>
+                </div>
+                <hr class="my-2" />
+                <div class="small text-muted">
+                    Aktiv: <strong>@users.Count(u => u.IsActive)</strong> &nbsp;|&nbsp;
+                    Inaktiv: <strong>@users.Count(u => !u.IsActive)</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center gap-3">
+                    <i class="bi bi-list-nested text-success" style="font-size:2rem;"></i>
+                    <div>
+                        <div class="fs-3 fw-bold">@navItems.Count</div>
+                        <div class="text-muted small">Navigationseinträge</div>
+                    </div>
+                </div>
+                <hr class="my-2" />
+                <div class="small text-muted">
+                    Top-Level: <strong>@navItems.Count(i => string.IsNullOrEmpty(i.ParentId))</strong> &nbsp;|&nbsp;
+                    Unterseiten: <strong>@navItems.Count(i => !string.IsNullOrEmpty(i.ParentId))</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center gap-3">
+                    <i class="bi bi-puzzle-fill text-warning" style="font-size:2rem;"></i>
+                    <div>
+                        <div class="fs-3 fw-bold">@navItems.Count(i => !string.IsNullOrEmpty(i.Widget))</div>
+                        <div class="text-muted small">Seiten mit Widget</div>
+                    </div>
+                </div>
+                <hr class="my-2" />
+                <div class="small text-muted">
+                    Widgets: <strong>@navItems.Where(i => !string.IsNullOrEmpty(i.Widget)).Select(i => i.Widget).Distinct().Count()</strong> verschiedene
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 mt-2">
+        <h6 class="text-muted text-uppercase small mb-2">Letzte Logins</h6>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Benutzer</th>
+                        <th>Rollen</th>
+                        <th>Logins</th>
+                        <th>Letzter Login</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var u in users.Where(u => u.LastLoginAt.HasValue)
+                                            .OrderByDescending(u => u.LastLoginAt)
+                                            .Take(5))
+                    {
+                        <tr>
+                            <td><strong>@u.UserName</strong> <span class="text-muted small">@u.Kuerzel</span></td>
+                            <td><span class="text-muted small">@string.Join(", ", u.Roles)</span></td>
+                            <td>@u.LoginCount</td>
+                            <td class="text-muted small">@u.LastLoginAt?.ToString("dd.MM.yyyy HH:mm")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>

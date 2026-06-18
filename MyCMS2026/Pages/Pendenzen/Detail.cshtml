@@ -1,0 +1,125 @@
+@page
+@model MyCMS2026.Pages.Pendenzen.PendenzDetailModel
+@{
+    ViewData["Title"] = $"Pendenz #{Model.Pendenz?.Nr}";
+    var p = Model.Pendenz!;
+    var today = DateTime.Today;
+    var isOverdue = !p.Erledigt && p.ErledigenBis.HasValue && p.ErledigenBis.Value.Date < today;
+}
+
+<div>
+    <div class="cms-page-header">
+        <h1 class="cms-page-title">
+            <i class="bi bi-card-text me-2 fs-4"></i>Pendenz #@p.Nr
+        </h1>
+        <div class="d-flex gap-2">
+            @if (Model.CanEdit)
+            {
+                <a asp-page="Edit"
+                   asp-route-pendenzId="@p.Id"
+                   asp-route-returnId="@Model.ReturnId"
+                   class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-pencil me-1"></i>Bearbeiten
+                </a>
+            }
+            <a asp-page="/Page/Index" asp-route-id="@Model.ReturnId" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i>Zurück
+            </a>
+        </div>
+    </div>
+    <div class="cms-page-body">
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body">
+
+            @* Status-Badge *@
+            <div class="mb-3">
+                @if (p.Erledigt)
+                {
+                    <span class="badge pend-badge-done fs-6"><i class="bi bi-check-circle me-1"></i>Erledigt</span>
+                }
+                else if (isOverdue)
+                {
+                    <span class="badge pend-badge-open fs-6"><i class="bi bi-exclamation-circle me-1"></i>Überfällig</span>
+                }
+                else if (p.IstErinnerung)
+                {
+                    <span class="badge bg-warning text-dark fs-6"><i class="bi bi-bell me-1"></i>Erinnerung</span>
+                }
+                else
+                {
+                    <span class="badge pend-badge-open fs-6"><i class="bi bi-circle me-1"></i>Offen</span>
+                }
+            </div>
+
+            @* Haupttext *@
+            <div class="mb-4">
+                <label class="form-label text-muted small fw-semibold text-uppercase">Pendenz / Aufgabe</label>
+                <p class="fs-5 mb-0" style="white-space: pre-wrap;">@p.Text</p>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label text-muted small fw-semibold text-uppercase">Verantwortlich (intern)</label>
+                    <div>@(string.IsNullOrEmpty(p.Verantwortlich) ? "–" : p.Verantwortlich)</div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label text-muted small fw-semibold text-uppercase">Verantwortlich (extern)</label>
+                    <div>@(string.IsNullOrEmpty(p.Extern) ? "–" : p.Extern)</div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label text-muted small fw-semibold text-uppercase">Referenznummer</label>
+                    <div>@(string.IsNullOrEmpty(p.Nummer) ? "–" : p.Nummer)</div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label text-muted small fw-semibold text-uppercase">Erledigen bis</label>
+                    <div class="@(isOverdue ? "text-danger fw-semibold" : "")">
+                        @(p.ErledigenBis.HasValue ? p.ErledigenBis.Value.ToString("dd.MM.yyyy") : "–")
+                        @if (isOverdue)
+                        {
+                            <span class="badge pend-badge-overdue ms-1">@((int)(today - p.ErledigenBis!.Value.Date).TotalDays)d überfällig</span>
+                        }
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label text-muted small fw-semibold text-uppercase">Erfasst am</label>
+                    <div>@p.ErfasstAm.ToString("dd.MM.yyyy HH:mm") <span class="text-muted">von @p.ErfasstVon</span></div>
+                </div>
+                @if (p.Erledigt && p.ErledigtAm.HasValue)
+                {
+                    <div class="col-md-4">
+                        <label class="form-label text-muted small fw-semibold text-uppercase">Erledigt am</label>
+                        <div>@p.ErledigtAm.Value.ToString("dd.MM.yyyy HH:mm") <span class="text-muted">von @p.ErledigtVon</span></div>
+                    </div>
+                }
+            </div>
+
+        </div>
+    </div>
+
+    @* Änderungsprotokoll *@
+    @if (p.History.Any())
+    {
+        <div class="card border-0 shadow-sm mt-3">
+            <div class="card-header bg-light py-2">
+                <small class="text-muted fw-semibold"><i class="bi bi-clock-history me-1"></i>Änderungsprotokoll</small>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        @foreach (var log in p.History)
+                        {
+                            <tr>
+                                <td class="text-muted small ps-3" style="width:160px;">@log.Timestamp.ToString("dd.MM.yy HH:mm")</td>
+                                <td class="small fw-semibold" style="width:130px;">@log.User</td>
+                                <td class="small">@log.Aktion</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    </div>@* /cms-page-body *@
+</div>

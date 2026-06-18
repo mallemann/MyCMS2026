@@ -1,0 +1,125 @@
+@page
+@model MyCMS2026.Pages.Admin.EditHtmlPageModel
+@{
+    ViewData["Title"] = $"Seite bearbeiten – {Model.FileName}";
+}
+
+<div>
+    <div class="cms-page-header">
+        <h1 class="cms-page-title"><i class="bi bi-pencil-square me-2 fs-4"></i>Seite bearbeiten: <code class="fs-5">@Model.FileName</code></h1>
+        @if (!string.IsNullOrEmpty(Model.ReturnId))
+        {
+            <a asp-page="/Page/Index" asp-route-id="@Model.ReturnId" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i>Zurück zur Seite
+            </a>
+        }
+    </div>
+    <div class="cms-page-body">
+
+    @if (!string.IsNullOrEmpty(Model.Message))
+    {
+        <div class="alert alert-@(Model.IsError ? "danger" : "success") alert-dismissible">
+            @Model.Message
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (Model.FileNotFound)
+    {
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            Die Datei <code>App_Data/pages/@Model.FileName</code> existiert noch nicht.
+            Sie wird beim Speichern automatisch erstellt.
+        </div>
+    }
+
+    <form method="post">
+        <input type="hidden" name="fileName" value="@Model.FileName" />
+        <input type="hidden" name="returnId" value="@Model.ReturnId" />
+        <textarea id="htmlEditor" name="content" style="display:none;">@Model.Content</textarea>
+        <div class="mt-3 d-flex gap-2">
+            <button type="submit" class="btn btn-cms">
+                <i class="bi bi-floppy me-1"></i>Speichern
+            </button>
+            @if (!string.IsNullOrEmpty(Model.ReturnId))
+            {
+                <a asp-page="/Page/Index" asp-route-id="@Model.ReturnId" class="btn btn-outline-secondary">
+                    Abbrechen
+                </a>
+            }
+        </div>
+    </form>
+    </div>@* /cms-page-body *@
+</div>
+
+@section Scripts {
+<link href="https://cdnjs.cloudflare.com/ajax/libs/summernote/0.8.20/summernote-bs5.min.css" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/summernote/0.8.20/summernote-bs5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/summernote/0.8.20/lang/summernote-de-DE.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $('#htmlEditor').summernote({
+            lang: 'de-DE',
+            height: 450,
+            toolbar: [
+                ['style',  ['style']],
+                ['font',   ['bold', 'italic', 'underline', 'strikethrough', 'clear']],
+                ['para',   ['ul', 'ol', 'paragraph']],
+                ['table',  ['table']],
+                ['insert', ['link', 'picture', 'hr']],
+                ['view',   ['fullscreen', 'codeview', 'undo', 'redo']]
+            ],
+            callbacks: {
+                // Bild hochladen statt als Base64 einbetten
+                onImageUpload: function (files) {
+                    for (var i = 0; i < files.length; i++) {
+                        uploadImage(files[i]);
+                    }
+                },
+                // Drag & Drop und Paste: ebenfalls hochladen
+                onMediaDelete: function (target) {
+                    // Optional: könnten wir serverseitig löschen
+                }
+            }
+        });
+
+        function uploadImage(file) {
+            var data = new FormData();
+            data.append('file', file);
+            $.ajax({
+                url:         '/Admin/UploadImage',
+                type:        'POST',
+                data:        data,
+                processData: false,
+                contentType: false,
+                success: function (resp) {
+                    $('#htmlEditor').summernote('insertImage', resp.url, file.name);
+                },
+                error: function (xhr) {
+                    var msg = xhr.responseJSON?.error ?? 'Upload fehlgeschlagen.';
+                    alert('Bild-Upload: ' + msg);
+                }
+            });
+        }
+
+        // Fix 1: Summernote generiert data-toggle (BS4) statt data-bs-toggle (BS5)
+        // → Bootstrap 5 öffnet die Dropdowns sonst nicht.
+        $('.note-toolbar [data-toggle="dropdown"]')
+            .attr('data-bs-toggle', 'dropdown')
+            .removeAttr('data-toggle');
+
+        // Fix 2: Fokus/Selektion bei Dropdown-Item-Klick erhalten,
+        // damit execCommand noch eine Auswahl vorfindet.
+        $(document).on('mousedown', '.note-toolbar .dropdown-menu .dropdown-item', function (e) {
+            e.preventDefault();
+        });
+
+        // Vor dem Absenden: Summernote-Inhalt ins Textarea schreiben
+        $('form').on('submit', function () {
+            $('#htmlEditor').val($('#htmlEditor').summernote('code'));
+            $('#htmlEditor').show();
+        });
+    });
+</script>
+}

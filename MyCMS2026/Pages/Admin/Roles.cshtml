@@ -1,0 +1,159 @@
+@page
+@model MyCMS2026.Pages.Admin.RolesModel
+@{
+    ViewData["Title"] = "Rollenverwaltung";
+    var msg = TempData["Msg"]?.ToString();
+}
+<div>
+    <div class="cms-page-header">
+        <h1 class="cms-page-title"><i class="bi bi-shield-lock me-2 fs-4"></i>Rollenverwaltung</h1>
+        <button class="btn btn-cms btn-sm" data-bs-toggle="modal" data-bs-target="#modalCreate">
+            <i class="bi bi-plus-lg me-1"></i>Neue Rolle
+        </button>
+    </div>
+    <div class="cms-page-body">
+
+    @if (!string.IsNullOrEmpty(msg))
+    {
+        <div class="alert alert-success alert-dismissible">
+            @msg
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @* Erklärungstext *@
+    <div class="alert alert-light border mb-4">
+        <h6 class="fw-bold mb-1"><i class="bi bi-info-circle me-1 text-primary"></i>Was sind Rollen?</h6>
+        <p class="mb-2 small">
+            Rollen steuern, welche Benutzer auf welche Seiten und Funktionen zugreifen dürfen.
+            Jeder Benutzer hat eine oder mehrere Rollen. In der Navigation wird pro Seite festgelegt,
+            welche Rolle nötig ist, um sie zu <strong>sehen</strong>, zu <strong>lesen</strong>
+            oder zu <strong>bearbeiten</strong>.
+        </p>
+        <p class="mb-0 small">
+            <strong>Beispiel:</strong> Seite sichtbar für <code>Member</code>, bearbeitbar für <code>Administrator</code>.
+            Ein Benutzer mit nur der Rolle <code>Member</code> sieht die Seite, kann aber nichts ändern.
+        </p>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th style="width:40px;">Ord.</th>
+                    <th style="width:160px;">Rollenname</th>
+                    <th>Beschreibung</th>
+                    <th style="width:80px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in Model.Roles)
+                {
+                    <tr>
+                        <td class="text-muted small">@r.SortOrder</td>
+                        <td>
+                            <span class="badge bg-secondary fs-6 fw-normal px-2">@r.Name</span>
+                        </td>
+                        <td class="small text-muted">@r.Description</td>
+                        <td>
+                            <div class="d-flex gap-1">
+                                <button class="btn btn-outline-secondary btn-sm"
+                                        onclick="openEdit('@r.Id','@r.Name','@Html.Raw(r.Description.Replace("'", "\\'"))','@r.SortOrder')"
+                                        title="Bearbeiten">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <form method="post" asp-page-handler="Delete" class="d-inline">
+                                    <input type="hidden" name="id" value="@r.Id" />
+                                    <button type="button" class="btn btn-outline-danger btn-sm" title="Löschen"
+                                            onclick="cmsConfirmDelete(this.closest('form'), 'Rolle «@r.Name» wirklich löschen?')">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    </div>@* /cms-page-body *@
+</div>
+
+@* Modal Neu *@
+<div class="modal fade" id="modalCreate" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" asp-page-handler="Create">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-shield-plus me-2"></i>Neue Rolle</h5>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Rollenname <span class="text-danger">*</span></label>
+                        <input name="name" class="form-control" required placeholder="z.B. Vorstand" />
+                        <div class="form-text">Gross-/Kleinschreibung wird beachtet. Einmal vergeben, möglichst nicht mehr umbenennen.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Beschreibung</label>
+                        <textarea name="description" class="form-control" rows="3"
+                                  placeholder="Was darf diese Rolle? Für wen ist sie gedacht?"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Reihenfolge</label>
+                        <input name="sortOrder" type="number" class="form-control" value="10" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-cms">Erstellen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@* Modal Bearbeiten *@
+<div class="modal fade" id="modalEdit" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" asp-page-handler="Update">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-shield-check me-2"></i>Rolle bearbeiten</h5>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="eId" name="id" />
+                    <div class="mb-3">
+                        <label class="form-label">Rollenname <span class="text-danger">*</span></label>
+                        <input id="eName" name="name" class="form-control" required />
+                        <div class="form-text text-warning"><i class="bi bi-exclamation-triangle me-1"></i>Umbenennen ändert auch alle Benutzer und Navigationszuweisungen nicht automatisch!</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Beschreibung</label>
+                        <textarea id="eDescription" name="description" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Reihenfolge</label>
+                        <input id="eSortOrder" name="sortOrder" type="number" class="form-control" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-cms">Speichern</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+function openEdit(id, name, description, sortOrder) {
+    document.getElementById('eId').value = id;
+    document.getElementById('eName').value = name;
+    document.getElementById('eDescription').value = description;
+    document.getElementById('eSortOrder').value = sortOrder;
+    new bootstrap.Modal(document.getElementById('modalEdit')).show();
+}
+</script>
+}

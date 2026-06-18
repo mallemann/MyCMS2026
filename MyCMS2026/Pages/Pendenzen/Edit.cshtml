@@ -1,0 +1,151 @@
+@page
+@model MyCMS2026.Pages.Pendenzen.PendenzEditModel
+@inject MyCMS2026.Services.UserService UserSvc
+@{
+    ViewData["Title"] = Model.IsNew ? "Neue Pendenz" : $"Pendenz #{Model.Input.Nr} bearbeiten";
+    var internalUsers = (await UserSvc.GetAllAsync()).Where(u => u.IsActive).OrderBy(u => u.UserName).ToList();
+}
+
+<div>
+    <div class="cms-page-header">
+        <h1 class="cms-page-title">
+            <i class="bi bi-@(Model.IsNew ? "plus-circle" : "pencil-square") me-2 fs-4"></i>@(Model.IsNew ? "Neue Pendenz" : $"Pendenz #{Model.Input.Nr}")
+        </h1>
+        <a asp-page="/Page/Index" asp-route-id="@Model.ReturnId" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>Zurück
+        </a>
+    </div>
+    <div class="cms-page-body">
+
+    @if (!string.IsNullOrEmpty(Model.Message))
+    {
+        <div class="alert alert-@(Model.IsError ? "danger" : "success") alert-dismissible">
+            @Model.Message
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body">
+            <form method="post">
+                <div asp-validation-summary="All" class="text-danger small mb-2"></div>
+                <input type="hidden" asp-for="PendenzId" />
+                <input type="hidden" asp-for="ReturnId" />
+                <input type="hidden" asp-for="Input.Id" />
+                <input type="hidden" asp-for="Input.Nr" />
+                <input type="hidden" asp-for="Input.ConfigString" />
+
+                <div class="row g-3">
+
+
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Pendenz / Aufgabe <span class="text-danger">*</span></label>
+                        <textarea asp-for="Input.Text" class="form-control" rows="3" placeholder="Beschreibung der Aufgabe..."></textarea>
+                        <span asp-validation-for="Input.Text" class="text-danger small"></span>
+                    </div>
+
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Verantwortlich (intern)</label>
+                        @if (Model.IsPersonalMode)
+                        {
+                            <input type="hidden" asp-for="Input.Verantwortlich" />
+                            <div class="form-control-plaintext fw-semibold">
+                                <i class="bi bi-person-fill me-1 text-muted"></i>@Model.Input.Verantwortlich
+                            </div>
+                        }
+                        else
+                        {
+                            <select asp-for="Input.Verantwortlich" class="form-select">
+                                <option value="">– nicht zugewiesen –</option>
+                                @foreach (var u in internalUsers)
+                                {
+                                    <option value="@u.UserName">@u.UserName (@(u.Kuerzel))</option>
+                                }
+                            </select>
+                        }
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Verantwortlich (extern)</label>
+                        <input asp-for="Input.Extern" class="form-control" placeholder="Name extern..." />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Referenznummer</label>
+                        <input asp-for="Input.Nummer" class="form-control" placeholder="Archiv-Nr., Referenz..." />
+                    </div>
+
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Erledigen bis</label>
+                        <input asp-for="Input.ErledigenBis" type="date" class="form-control" />
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end pb-1">
+                        <div class="form-check form-switch">
+                            <input asp-for="Input.IstErinnerung" class="form-check-input" type="checkbox" role="switch" />
+                            <label asp-for="Input.IstErinnerung" class="form-check-label">
+                                <i class="bi bi-bell me-1 text-warning"></i>Ist eine Erinnerung (kein Task)
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end pb-1">
+                        <div class="form-check form-switch">
+                            <input asp-for="Input.Erledigt" class="form-check-input" type="checkbox" role="switch" />
+                            <label asp-for="Input.Erledigt" class="form-check-label">
+                                <i class="bi bi-check-circle me-1 text-success"></i>Erledigt
+                            </label>
+                        </div>
+                    </div>
+
+                </div>
+
+                <hr class="my-4" />
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-cms">
+                        <i class="bi bi-floppy me-1"></i>Speichern
+                    </button>
+                    <a asp-page="/Page/Index" asp-route-id="@Model.ReturnId" class="btn btn-outline-secondary">
+                        Abbrechen
+                    </a>
+                    @if (!Model.IsNew && Model.Input.Erledigt && Model.CanDelete)
+                    {
+                        <button type="button" class="btn btn-outline-danger ms-auto"
+                                onclick="cmsConfirmDelete('penzDelForm', 'Pendenz #@Model.Input.Nr wirklich löschen?')">
+                            <i class="bi bi-trash me-1"></i>Löschen
+                        </button>
+                    }
+                </div>
+            </form>
+            @if (!Model.IsNew && Model.Input.Erledigt && Model.CanDelete)
+            {
+                <form id="penzDelForm" method="post" asp-page-handler="Delete" style="display:none">
+                    <input type="hidden" name="Input.Id" value="@Model.Input.Id" />
+                    <input type="hidden" name="ReturnId" value="@Model.ReturnId" />
+                </form>
+            }
+        </div>
+    </div>
+
+    @if (!Model.IsNew && Model.Input.History.Any())
+    {
+        <div class="card border-0 shadow-sm mt-3">
+            <div class="card-header bg-light py-2">
+                <small class="text-muted fw-semibold"><i class="bi bi-clock-history me-1"></i>Änderungsprotokoll</small>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        @foreach (var log in Model.Input.History)
+                        {
+                            <tr>
+                                <td class="text-muted small ps-3" style="width:160px;">@log.Timestamp.ToString("dd.MM.yy HH:mm")</td>
+                                <td class="small fw-semibold" style="width:130px;">@log.User</td>
+                                <td class="small">@log.Aktion</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+    </div>@* /cms-page-body *@
+</div>

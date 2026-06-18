@@ -1,0 +1,176 @@
+@model MyCMS2026.Pages.Page.PageIndexModel
+@using MyCMS2026.Services
+@using MyCMS2026.Models
+@inject VaultService VaultSvc
+@{
+    var isAdmin = User.IsInRole("Administrator");
+    var gruppe  = Model.NavItem?.ConfigString ?? "";
+    var pageId  = Model.Id;
+
+    // Filter aus Query-String
+    var search = Context.Request.Query["search"].ToString();
+
+    var folders = VaultSvc.GetFolders(gruppe);
+    var subfolders = folders.Where(f => !f.IsRoot).Select(f => f.FolderName).ToList();
+
+    // Suche anwenden
+    if (!string.IsNullOrWhiteSpace(search))
+    {
+        foreach (var f in folders)
+            f.Files = f.Files.Where(fi =>
+                fi.FileName.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                fi.Description.Contains(search, StringComparison.OrdinalIgnoreCase)).ToList();
+    }
+
+    int totalFiles = folders.Sum(f => f.Files.Count);
+}
+
+@* Upload-Modal *@
+@if (isAdmin)
+{
+    <div class="modal fade" id="wVaultUploadModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form method="post" asp-page="/Vault/Index" asp-page-handler="Upload" enctype="multipart/form-data">
+                    <input type="hidden" name="gruppe" value="@gruppe" />
+                    <div class="modal-header card-header-cms rounded-0">
+                        <h5 class="modal-title text-white"><i class="bi bi-upload me-2"></i>Datei hochladen</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Ordner</label>
+                                <select name="subfolder" class="form-select form-select-sm">
+                                    <option value="">(Hauptordner)</option>
+                                    @foreach (var sub in subfolders)
+                                    {
+                                        <option value="@sub">📁 @sub</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Datei <span class="text-danger">*</span></label>
+                                <input type="file" name="uploadFile" class="form-control form-control-sm" required />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Beschreibung</label>
+                                <input type="text" name="description" class="form-control form-control-sm" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                        <button type="submit" class="btn btn-cms"><i class="bi bi-cloud-upload me-1"></i>Hochladen</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+    <span class="text-muted small">@totalFiles Datei(en) in @folders.Count Ordner</span>
+    @if (isAdmin)
+    {
+        <button class="btn btn-cms btn-sm" data-bs-toggle="modal" data-bs-target="#wVaultUploadModal">
+            <i class="bi bi-upload me-1"></i>Hochladen
+        </button>
+    }
+</div>
+
+<div class="cms-filter-bar mb-3">
+    <form method="get" class="d-flex gap-2 align-items-center">
+        <input type="hidden" name="Id" value="@pageId" />
+        <input type="text" name="search" value="@search" class="form-control form-control-sm"
+               placeholder="Datei suchen..." style="max-width:300px;" />
+        <button type="submit" class="btn btn-cms btn-sm"><i class="bi bi-search"></i></button>
+        @if (!string.IsNullOrEmpty(search))
+        {
+            <a href="/Page/Index?Id=@pageId" class="btn btn-outline-secondary btn-sm">Reset</a>
+        }
+        <a asp-page="/Vault/Index" asp-route-gruppe="@gruppe" class="btn btn-outline-secondary btn-sm ms-auto">
+            <i class="bi bi-arrows-fullscreen me-1"></i>Vollansicht
+        </a>
+    </form>
+</div>
+
+@if (totalFiles == 0)
+{
+    <div class="text-center py-4 text-muted">
+        <i class="bi bi-safe2 fs-1"></i>
+        <p class="mt-2">Noch keine Dateien vorhanden.</p>
+    </div>
+}
+else
+{
+    var fi = 0;
+    foreach (var folder in folders.Where(f => f.Files.Any()))
+    {
+        var collapseId = folder.IsRoot ? "wv-root" : $"wv-sub-{fi++}";
+        <div class="card mb-2">
+            @if (folder.IsRoot)
+            {
+                <div class="card-header d-flex align-items-center gap-2 py-2">
+                    <i class="bi bi-folder2-open text-warning"></i>
+                    <span class="fw-semibold small">Hauptordner</span>
+                    <span class="badge bg-secondary ms-1">@folder.Files.Count</span>
+                </div>
+            }
+            else
+            {
+                <div class="card-header d-flex align-items-center gap-2 py-2"
+                     role="button" data-bs-toggle="collapse" data-bs-target="#@collapseId" style="cursor:pointer;">
+                    <i class="bi bi-folder-fill text-warning"></i>
+                    <span class="fw-semibold small flex-fill">@folder.FolderName</span>
+                    <span class="badge bg-secondary">@folder.Files.Count</span>
+                    <i class="bi bi-chevron-down text-muted small"></i>
+                </div>
+            }
+            <div class="@(folder.IsRoot ? "" : "collapse")" id="@collapseId">
+                @foreach (var f in folder.Files)
+                {
+                    var ext  = System.IO.Path.GetExtension(f.FileName).TrimStart('.').ToLowerInvariant();
+                    string icon = ext switch {
+                        "pdf"  => "bi-file-earmark-pdf text-danger",
+                        "doc" or "docx" => "bi-file-earmark-word text-primary",
+                        "xls" or "xlsx" => "bi-file-earmark-excel text-success",
+                        "ppt" or "pptx" => "bi-file-earmark-ppt text-warning",
+                        "jpg" or "jpeg" or "png" or "gif" => "bi-file-earmark-image text-info",
+                        _ => "bi-file-earmark text-muted"
+                    };
+                    <div class="file-item px-3">
+                        <i class="bi @icon fs-5"></i>
+                        <div class="flex-grow-1" style="min-width:0">
+                            <a asp-page="/Vault/File"
+                               asp-route-gruppe="@gruppe"
+                               asp-route-subfolder="@folder.FolderName"
+                               asp-route-fileName="@f.FileName"
+                               class="text-decoration-none d-block text-truncate fw-semibold">@f.FileName</a>
+                            @if (!string.IsNullOrEmpty(f.Description))
+                            {
+                                <small class="text-muted">@f.Description</small>
+                            }
+                            else
+                            {
+                                <small class="text-muted">@f.SizeText · @f.UploadedAt.ToString("dd.MM.yy")</small>
+                            }
+                        </div>
+                        @if (isAdmin)
+                        {
+                            <form method="post" asp-page="/Vault/Index" asp-page-handler="Delete" class="d-inline">
+                                <input type="hidden" name="fileName" value="@f.FileName" />
+                                <input type="hidden" name="subfolder" value="@folder.FolderName" />
+                                <input type="hidden" name="gruppe" value="@gruppe" />
+                                <button type="button" class="btn btn-sm btn-outline-danger" title="Löschen"
+                                        onclick="cmsConfirmDelete(this.closest('form'), '@f.FileName.Replace("'", "\\'") löschen?')">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+}

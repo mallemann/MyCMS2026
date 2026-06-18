@@ -1,0 +1,120 @@
+@page
+@model MyCMS2026.Pages.Projects.ProjectIndexModel
+@{
+    ViewData["Title"] = "Projekte";
+}
+
+<div class="cms-page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h1 class="cms-page-title"><i class="bi bi-kanban me-2"></i>Projekte</h1>
+    @if (Model.IsAdmin)
+    {
+        <a asp-page="Edit" class="btn btn-cms btn-sm">
+            <i class="bi bi-plus-circle me-1"></i>Neues Projekt
+        </a>
+    }
+</div>
+<div class="cms-page-body">
+
+    @if (!Model.Projects.Any())
+    {
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-kanban fs-1 d-block mb-2"></i>
+            Noch keine Projekte vorhanden.
+        </div>
+    }
+    else
+    {
+        var aktiv       = Model.Projects.Where(p => p.Status != "Abgeschlossen").ToList();
+        var abgeschl    = Model.Projects.Where(p => p.Status == "Abgeschlossen").ToList();
+
+        @if (aktiv.Any())
+        {
+            <div class="row g-3 mb-4">
+                @foreach (var p in aktiv)
+                {
+                    <div class="col-md-6 col-lg-4">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <span class="fw-semibold text-truncate me-2">
+                                    <a asp-page="Detail" asp-route-id="@p.Id" class="text-decoration-none stretched-link">
+                                        @p.Name
+                                    </a>
+                                </span>
+                                <span class="badge @(p.Status == "Aktiv" ? "bg-success" : "bg-warning text-dark") flex-shrink-0">
+                                    @p.Status
+                                </span>
+                            </div>
+                            <div class="card-body py-2">
+                                @if (!string.IsNullOrEmpty(p.Beschreibung))
+                                {
+                                    <p class="small text-muted mb-2">@p.Beschreibung</p>
+                                }
+                                <div class="small text-muted d-flex gap-3">
+                                    @if (!string.IsNullOrEmpty(p.Projektleiter))
+                                    {
+                                        <span><i class="bi bi-person me-1"></i>@p.Projektleiter</span>
+                                    }
+                                    @if (p.EndDatum.HasValue)
+                                    {
+                                        <span><i class="bi bi-calendar me-1"></i>bis @p.EndDatum.Value.ToString("dd.MM.yyyy")</span>
+                                    }
+                                    <span><i class="bi bi-journal-text me-1"></i>@p.Journal.Count Einträge</span>
+                                </div>
+                            </div>
+                            @if (Model.IsAdmin)
+                            {
+                                <div class="card-footer d-flex justify-content-end gap-1 py-1 position-relative" style="z-index:2">
+                                    <a asp-page="Edit" asp-route-id="@p.Id" class="btn btn-sm btn-outline-secondary">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <form id="delProj-@p.Id" method="post" asp-page-handler="Delete" style="display:none">
+                                        <input type="hidden" name="id" value="@p.Id" />
+                                    </form>
+                                    <button type="button" class="btn btn-sm btn-outline-danger"
+                                            onclick="cmsConfirmDelete('delProj-@p.Id', 'Projekt «@p.Name.Replace("'", "\\'")» wirklich löschen?')">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (abgeschl.Any())
+        {
+            <h6 class="text-muted mt-4 mb-3"><i class="bi bi-check-circle me-1"></i>Abgeschlossen</h6>
+            <div class="row g-2">
+                @foreach (var p in abgeschl)
+                {
+                    <div class="col-md-6 col-lg-4">
+                        <div class="card h-100 border-secondary opacity-75">
+                            <div class="card-body py-2">
+                                <a asp-page="Detail" asp-route-id="@p.Id" class="fw-semibold text-decoration-none text-body">
+                                    @p.Name
+                                </a>
+                                @if (!string.IsNullOrEmpty(p.Projektleiter))
+                                {
+                                    <span class="text-muted small ms-2">– @p.Projektleiter</span>
+                                }
+                                @if (Model.IsAdmin)
+                                {
+                                    <span class="float-end">
+                                        <form id="delProj-@p.Id" method="post" asp-page-handler="Delete" style="display:none">
+                                            <input type="hidden" name="id" value="@p.Id" />
+                                        </form>
+                                        <button type="button" class="btn btn-sm btn-outline-danger"
+                                                onclick="cmsConfirmDelete('delProj-@p.Id', 'Projekt «@p.Name.Replace("'", "\\'")» wirklich löschen?')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>

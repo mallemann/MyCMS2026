@@ -1,0 +1,151 @@
+@page
+@model MyCMS2026.Pages.Downloads.DownloadsIndexModel
+@inject MyCMS2026.Services.KlassenService KlassenSvc
+@{
+    ViewData["Title"] = "Downloads";
+    var isAdmin = User.IsInRole("Administrator"); // Standalone-Seite: nur Admin
+    var gruppe  = Model.Gruppe;
+    var dlKlassen = await KlassenSvc.GetKlassenAsync("downloads");
+}
+
+@* Delete-Forms *@
+@foreach (var d in Model.Downloads)
+{
+    <form id="delForm-@d.Id" method="post" asp-page-handler="Delete" style="display:none">
+        <input type="hidden" name="id" value="@d.Id" />
+        <input type="hidden" name="gruppe" value="@gruppe" />
+    </form>
+}
+
+
+<div class="cms-page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h1 class="cms-page-title">
+        <i class="bi bi-download me-2"></i>Downloads
+        @if (!string.IsNullOrEmpty(gruppe))
+        {
+            <span class="badge bg-secondary fs-6 fw-normal ms-2">@gruppe</span>
+        }
+    </h1>
+</div>
+<div class="cms-page-body">
+
+    @if (isAdmin)
+    {
+        <div class="card mb-4">
+            <div class="card-header-cms"><i class="bi bi-cloud-upload me-2"></i>Datei hochladen</div>
+            <div class="card-body">
+                @if (!string.IsNullOrEmpty(Model.UploadMessage))
+                {
+                    <div class="alert alert-success py-2">@Model.UploadMessage</div>
+                }
+                <form method="post" enctype="multipart/form-data" asp-page-handler="Upload" class="row g-2 align-items-end">
+                    <input type="hidden" name="gruppe" value="@gruppe" />
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Datei</label>
+                        <input type="file" name="uploadFile" class="form-control form-control-sm" required />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Beschreibung</label>
+                        <input type="text" name="beschreibung" class="form-control form-control-sm" required />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-semibold">Klasse</label>
+                        <select name="klasse" class="form-select form-select-sm">
+                            @foreach (var k in dlKlassen)
+                            {
+                                <option value="@k">@k</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-cms btn-sm w-100">
+                            <i class="bi bi-upload me-1"></i>Hochladen
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    }
+
+    <div class="cms-filter-bar">
+        <form method="get" class="row g-2 align-items-end">
+            <input type="hidden" name="gruppe" value="@gruppe" />
+            <div class="col-sm-4 col-md-3">
+                <input type="text" name="search" value="@Model.Search" class="form-control form-control-sm" placeholder="Beschreibung suchen..." />
+            </div>
+            <div class="col-sm-3 col-md-2">
+                <select name="klasse" class="form-select form-select-sm">
+                    <option value="">Alle Klassen</option>
+                    @foreach (var k in dlKlassen)
+                    {
+                        <option value="@k" selected="@(Model.KlasseFilter == k ? "selected" : null)">@k</option>
+                    }
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-cms btn-sm"><i class="bi bi-funnel me-1"></i>Filter</button>
+                <a asp-page="Index" asp-route-gruppe="@gruppe" class="btn btn-outline-secondary btn-sm ms-1">Reset</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Beschreibung</th>
+                    <th>Dateiname</th>
+                    <th>Klasse</th>
+                    <th>Erstellt</th>
+                    <th>Grösse</th>
+                    <th class="text-end">Aktionen</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Downloads.Any())
+                {
+                    <tr><td colspan="6" class="text-center text-muted py-4">Keine Downloads vorhanden.</td></tr>
+                }
+                @foreach (var d in Model.Downloads)
+                {
+                    var ext = System.IO.Path.GetExtension(d.OriginalName).ToLowerInvariant();
+                    string icon;
+                    if (ext == ".pdf") icon = "bi-file-pdf text-danger";
+                    else if (ext == ".docx" || ext == ".doc") icon = "bi-file-word text-primary";
+                    else if (ext == ".xlsx" || ext == ".xls") icon = "bi-file-excel text-success";
+                    else if (ext == ".pptx" || ext == ".ppt") icon = "bi-file-ppt text-warning";
+                    else icon = "bi-file-earmark";
+                    <tr>
+                        <td>@d.Beschreibung</td>
+                        <td>
+                            <i class="bi @icon me-1"></i>
+                            <a asp-page="/Downloads/File" asp-route-storedName="@d.StoredName" class="text-decoration-none">@d.OriginalName</a>
+                        </td>
+                        <td><span class="badge bg-light text-dark border">@d.Klasse</span></td>
+                        <td class="text-muted small">@d.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")</td>
+                        <td class="text-muted small">@(d.Size / 1024) KB</td>
+                        <td class="text-end">
+                            <a asp-page="/Downloads/File" asp-route-storedName="@d.StoredName"
+                               class="btn btn-sm btn-outline-primary" title="Herunterladen">
+                                <i class="bi bi-download"></i>
+                            </a>
+                            @if (isAdmin)
+                            {
+                                <form id="delDl-@d.Id" method="post" asp-page-handler="Delete" style="display:none">
+                                    <input type="hidden" name="id" value="@d.Id" />
+                                    <input type="hidden" name="groupe" value="@gruppe" />
+                                </form>
+                                <button type="button" class="btn btn-sm btn-outline-danger" title="Löschen"
+                                        onclick="cmsConfirmDelete('delDl-@d.Id', '@d.OriginalName.Replace("'", "\\'") löschen?')">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+</div>
+

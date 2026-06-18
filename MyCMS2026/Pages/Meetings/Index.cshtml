@@ -1,0 +1,141 @@
+@page
+@model MyCMS2026.Pages.Meetings.MeetingsIndexModel
+@inject MyCMS2026.Services.KlassenService KlassenSvc
+@{
+    ViewData["Title"] = "Meetings";
+    var isAdmin = User.IsInRole("Administrator");
+    var gruppe  = Model.Gruppe;
+    var meetingKlassen = await KlassenSvc.GetKlassenAsync("meetings");
+}
+
+@* Delete-Forms ausserhalb der Tabelle *@
+@foreach (var m in Model.Meetings)
+{
+    <form id="delForm-@m.Id" method="post" asp-page-handler="Delete" style="display:none">
+        <input type="hidden" name="id" value="@m.Id" />
+        <input type="hidden" name="gruppe" value="@gruppe" />
+    </form>
+}
+
+
+<div class="cms-page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h1 class="cms-page-title">
+        <i class="bi bi-people me-2"></i>Meetingverwaltung
+        @if (!string.IsNullOrEmpty(gruppe))
+        {
+            <span class="badge bg-secondary fs-6 fw-normal ms-2">@gruppe</span>
+        }
+    </h1>
+    @if (isAdmin)
+    {
+        <a asp-page="Edit" asp-route-gruppe="@gruppe" class="btn btn-cms btn-sm">
+            <i class="bi bi-plus-circle me-1"></i>Neues Meeting anlegen
+        </a>
+    }
+</div>
+<div class="cms-page-body">
+
+    <div class="cms-filter-bar">
+        <form method="get" class="row g-2 align-items-end">
+            <input type="hidden" name="gruppe" value="@gruppe" />
+            <div class="col-sm-4 col-md-3">
+                <input type="text" name="search" value="@Model.Search" class="form-control form-control-sm" placeholder="Suchen..." />
+            </div>
+            <div class="col-sm-3 col-md-2">
+                <select name="status" class="form-select form-select-sm">
+                    <option value="">Alle Status</option>
+                    @foreach (var s in MyCMS2026.Models.Meeting.StatusOptions)
+                    {
+                        <option value="@s" selected="@(Model.StatusFilter == s ? "selected" : null)">@s</option>
+                    }
+                </select>
+            </div>
+            <div class="col-sm-3 col-md-2">
+                <select name="klasse" class="form-select form-select-sm">
+                    <option value="">Alle Klassen</option>
+                    @foreach (var k in meetingKlassen)
+                    {
+                        <option value="@k" selected="@(Model.KlasseFilter == k ? "selected" : null)">@k</option>
+                    }
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-cms btn-sm"><i class="bi bi-funnel me-1"></i>Filter</button>
+                <a asp-page="Index" asp-route-gruppe="@gruppe" class="btn btn-outline-secondary btn-sm ms-1">Reset</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th class="text-muted" style="width:50px;">#</th>
+                    <th>Thema</th>
+                    <th>Leitung</th>
+                    <th>Beschreibung</th>
+                    <th>Datum</th>
+                    <th>Status</th>
+                    <th>Dateien</th>
+                    <th>Klasse / Gruppe</th>
+                    <th class="text-end">Aktionen</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Meetings.Any())
+                {
+                    <tr><td colspan="9" class="text-center text-muted py-4">Keine Meetings gefunden.</td></tr>
+                }
+                @foreach (var m in Model.Meetings)
+                {
+                    var badgeClass = m.Status switch
+                    {
+                        "Abgeschlossen" => "badge-abgeschlossen",
+                        "Abgesagt"      => "badge-abgesagt",
+                        _               => "badge-geplant"
+                    };
+                    var beschreibung = m.Beschreibung ?? "";
+                    <tr onclick="location.href='@Url.Page("/Meetings/Detail", new { id = m.Id, gruppe = gruppe })'" style="cursor:pointer;">
+                        <td class="text-muted small">@m.MeetingNr</td>
+                        <td class="fw-semibold">@m.Thema
+                            @if (m.Files.Any())
+                            {
+                                <span class="badge bg-light text-muted border ms-1" title="@m.Files.Count Datei(en)"><i class="bi bi-paperclip"></i> @m.Files.Count</span>
+                            }
+                        </td>
+                        <td>@m.Leitung</td>
+                        <td class="text-muted small">@(beschreibung.Length > 60 ? beschreibung[..60] + "…" : beschreibung)</td>
+                        <td>@m.Datum.ToString("dd.MM.yyyy")</td>
+                        <td><span class="badge @badgeClass">@m.Status</span></td>
+                        <td>@m.Files.Count</td>
+                        <td>
+                            @if (!string.IsNullOrEmpty(m.Klasse))
+                            {
+                                <span class="badge bg-light text-dark border me-1">@m.Klasse</span>
+                            }
+                            @if (!string.IsNullOrEmpty(m.Gruppe))
+                            {
+                                <span class="badge bg-secondary">@m.Gruppe</span>
+                            }
+                        </td>
+                        <td class="text-end" onclick="event.stopPropagation()" style="white-space:nowrap">
+                            @if (isAdmin)
+                            {
+                                <a asp-page="Edit" asp-route-id="@m.Id" asp-route-gruppe="@gruppe"
+                                   class="btn btn-sm btn-outline-primary" title="Bearbeiten">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <button type="button" class="btn btn-sm btn-outline-danger" title="Löschen"
+                                        onclick="cmsConfirmDelete('delForm-@m.Id', '@m.Thema.Replace("'", "\\'") löschen?')">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+</div>
+

@@ -1,0 +1,64 @@
+@model MyCMS2026.Pages.Page.PageIndexModel
+@inject MyCMS2026.Services.SiteService SiteSvc
+@inject IWebHostEnvironment Env
+@{
+    var site     = await SiteSvc.GetAsync();
+    // Startseite immer aus "home.html" (kein ConfigString nötig)
+    var pageFile = "home.html";
+
+    var path = System.IO.Path.Combine(Env.ContentRootPath, "App_Data", "pages", pageFile);
+    var html = System.IO.File.Exists(path) ? System.IO.File.ReadAllText(path) : null;
+}
+
+<div class="row mt-2">
+    <div class="col-lg-8">
+
+        @if (Model.HasExtendedAccess)
+        {
+            <div class="mb-2 text-end">
+                <a asp-page="/Admin/EditHtmlPage"
+                   asp-route-fileName="@pageFile"
+                   asp-route-returnId="@Model.NavItem!.Id"
+                   class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-pencil me-1"></i>Seite bearbeiten
+                </a>
+            </div>
+        }
+
+        @if (html != null)
+        {
+            <div class="cms-html-content">@Html.Raw(html)</div>
+        }
+        else if (Model.HasExtendedAccess)
+        {
+            <div class="alert alert-light border">
+                <i class="bi bi-file-earmark-text me-2"></i>
+                Noch kein Inhalt hinterlegt. Klicken Sie oben auf «Seite bearbeiten» um die Startseite zu gestalten.
+            </div>
+        }
+
+    </div>
+    <div class="col-lg-4 mt-3 mt-lg-0">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-cms text-white"><i class="bi bi-info-circle me-2"></i>System-Info</div>
+            <ul class="list-group list-group-flush">
+                <li class="list-group-item d-flex justify-content-between">
+                    <span>Angemeldet als</span>
+                    <span class="text-muted">@Model.User.Identity?.Name</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between">
+                    <span>Rolle</span>
+                    <span class="text-muted">@string.Join(", ", Model.UserRoles)</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between">
+                    <span>Status</span>
+                    <span class="badge bg-success">@site.Status</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between">
+                    <span>Version</span>
+                    <span class="text-muted">MyCMS 2026</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>

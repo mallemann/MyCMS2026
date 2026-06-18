@@ -1,0 +1,184 @@
+@page
+@model MyCMS2026.Pages.Todos.TodoEditModel
+@inject MyCMS2026.Services.KlassenService KlassenSvc
+@inject MyCMS2026.Services.GruppenService GruppenSvc
+@{
+    ViewData["Title"] = string.IsNullOrEmpty(Model.Todo.Id) ? "Neue Aufgabe" : "Aufgabe bearbeiten";
+    var isNew = string.IsNullOrEmpty(Model.Todo.Id);
+    var todoKlassen = await KlassenSvc.GetKlassenAsync("todos");
+    var alleGruppen = await GruppenSvc.GetAllAsync();
+}
+
+<div>
+    <div class="cms-page-header d-flex justify-content-between align-items-center">
+        <h1 class="cms-page-title">
+            <i class="bi bi-check2-square me-2 fs-4"></i>
+            @(isNew ? "Neue Aufgabe" : $"Aufgabe #{Model.Todo.TaskNr} bearbeiten")
+        </h1>
+        @if (!string.IsNullOrEmpty(Model.ReturnPageId))
+        {
+            <a asp-page="/Page/Index" asp-route-id="@Model.ReturnPageId" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i>Zurück
+            </a>
+        }
+        else
+        {
+            <a asp-page="Index" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i>Zurück
+            </a>
+        }
+    </div>
+    <div class="cms-page-body" style="max-width:800px">
+
+        @if (!string.IsNullOrEmpty(Model.Error))
+        {
+            <div class="alert alert-danger">@Model.Error</div>
+        }
+
+        @* Dateilöschen-Formulare ausserhalb des Hauptformulars (verschachtelte forms = Bug) *@
+        @foreach (var f in Model.Todo.Files)
+        {
+            <form id="delTodoFile-@f.Id" method="post" asp-page-handler="DeleteFile" style="display:none">
+                <input type="hidden" name="id" value="@Model.Todo.Id" />
+                <input type="hidden" name="fileId" value="@f.Id" />
+            </form>
+        }
+
+        <form method="post" enctype="multipart/form-data">
+            <input type="hidden" asp-for="Todo.Id" />
+            <input type="hidden" asp-for="Todo.TaskNr" />
+            @* Gruppe wird unten als editierbares Feld angezeigt *@
+            <input type="hidden" name="ReturnProjectId" value="@Model.ReturnProjectId" />
+            <input type="hidden" name="ReturnPageId" value="@Model.ReturnPageId" />
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Thema <span class="text-danger">*</span></label>
+                <input asp-for="Todo.Thema" class="form-control" required />
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Verantwortlich</label>
+                    @if (Model.Kuerzel.Any())
+                    {
+                        <input asp-for="Todo.Verantwortlich" class="form-control" list="kuerzel-list" />
+                        <datalist id="kuerzel-list">
+                            @foreach (var k in Model.Kuerzel)
+                            {
+                                <option value="@k" />
+                            }
+                        </datalist>
+                    }
+                    else
+                    {
+                        <input asp-for="Todo.Verantwortlich" class="form-control" />
+                    }
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Klasse</label>
+                    <select asp-for="Todo.Klasse" class="form-select">
+                        @foreach (var k in todoKlassen)
+                        {
+                            <option value="@k">@k</option>
+                        }
+                        <option value="">– keine Klasse –</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Gruppe</label>
+                    <input asp-for="Todo.Gruppe" class="form-control" list="gruppenList" placeholder="– keine –" autocomplete="off" />
+                    <datalist id="gruppenList">
+                        @foreach (var g in alleGruppen) { <option value="@g" /> }
+                    </datalist>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Anlagedatum</label>
+                    <input asp-for="Todo.Anlagedatum" type="date" class="form-control" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Erledigen bis</label>
+                    <input asp-for="Todo.ErledigenBis" type="date" class="form-control" />
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Beschreibung</label>
+                <textarea asp-for="Todo.Beschreibung" class="form-control" rows="4"></textarea>
+            </div>
+
+            <div class="form-check mb-3">
+                @* Checkbox zuerst (value=true gewinnt wenn checked), hidden liefert false wenn unchecked *@
+                <input name="Todo.Erledigt" type="checkbox" class="form-check-input" value="true"
+                       checked="@(Model.Todo.Erledigt ? "checked" : null)" />
+                <input type="hidden" name="Todo.Erledigt" value="false" />
+                <label class="form-check-label">Erledigt</label>
+            </div>
+
+            @if (Model.Projects.Any())
+            {
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Projekt</label>
+                    <select asp-for="Todo.ProjectId" class="form-select">
+                        <option value="">– kein Projekt –</option>
+                        @foreach (var proj in Model.Projects)
+                        {
+                            <option value="@proj.Id">@proj.Name</option>
+                        }
+                    </select>
+                </div>
+            }
+
+            @* Bestehende Dateien *@
+            @if (Model.Todo.Files.Any())
+            {
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Angehängte Dateien</label>
+                    <ul class="list-group list-group-flush">
+                        @foreach (var f in Model.Todo.Files)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <span>
+                                    <i class="bi bi-file-earmark me-1"></i>
+                                    <a asp-page="/Todos/File" asp-route-id="@Model.Todo.Id" asp-route-fileId="@f.Id">@f.OriginalName</a>
+                                    <span class="text-muted small ms-1">(@(f.Size / 1024) KB)</span>
+                                </span>
+                                <button type="button" class="btn btn-outline-danger btn-sm"
+                                        onclick="cmsConfirmDelete('delTodoFile-@f.Id', 'Datei @f.OriginalName.Replace("'", "\\'") löschen?')">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+
+            <div class="mb-4">
+                <label class="form-label fw-semibold">Dateien hochladen</label>
+                <input type="file" name="UploadedFiles" class="form-control" multiple />
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-cms">
+                    <i class="bi bi-floppy me-1"></i>Speichern
+                </button>
+                @if (!string.IsNullOrEmpty(Model.ReturnPageId))
+                {
+                    <a asp-page="/Page/Index" asp-route-id="@Model.ReturnPageId" class="btn btn-outline-secondary">Abbrechen</a>
+                }
+                else if (!string.IsNullOrEmpty(Model.ReturnProjectId))
+                {
+                    <a asp-page="/Projects/Detail" asp-route-id="@Model.ReturnProjectId" asp-route-tab="todos"
+                       class="btn btn-outline-secondary">Abbrechen</a>
+                }
+                else
+                {
+                    <a asp-page="Index" class="btn btn-outline-secondary">Abbrechen</a>
+                }
+            </div>
+        </form>
+
+    </div>
+</div>

@@ -1,0 +1,175 @@
+@page
+@model MyCMS2026.Pages.Todos.TodoDetailModel
+@{
+    ViewData["Title"] = Model.Todo?.Thema ?? "Aufgabe";
+    var t = Model.Todo!;
+    var isAdmin = User.IsInRole("Administrator");
+    var diff = (t.ErledigenBis - DateTime.Today).Days;
+}
+
+@if (Model.Todo == null)
+{
+    <div class="cms-page-header">
+        <h1 class="cms-page-title">Aufgabe nicht gefunden</h1>
+    </div>
+    <div class="cms-page-body">
+        <div class="alert alert-warning">Aufgabe nicht gefunden.</div>
+        <a asp-page="Index" class="btn btn-cms">Zurück</a>
+    </div>
+}
+else
+{
+    <div class="cms-page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h1 class="cms-page-title">
+            @t.Thema <span class="badge bg-secondary fs-6 fw-normal ms-2">#@t.TaskNr</span>
+        </h1>
+        <div class="d-flex gap-2">
+            @if (!string.IsNullOrEmpty(Model.ReturnPageId))
+            {
+                <a asp-page="/Page/Index" asp-route-id="@Model.ReturnPageId" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-left me-1"></i>Zurück
+                </a>
+            }
+            else
+            {
+                <a asp-page="Index" asp-route-gruppe="@Model.Gruppe" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-left me-1"></i>Zurück
+                </a>
+            }
+            @if (isAdmin)
+            {
+                <a asp-page="Edit" asp-route-id="@t.Id" asp-route-gruppe="@Model.Gruppe"
+                   asp-route-returnPageId="@Model.ReturnPageId" class="btn btn-cms btn-sm">
+                    <i class="bi bi-pencil me-1"></i>Bearbeiten
+                </a>
+            }
+        </div>
+    </div>
+    <div class="cms-page-body">
+
+        <div class="row g-3 mb-4">
+            <div class="col-sm-6 col-md-3">
+                <div class="card p-3 text-center">
+                    <div class="text-muted small">Verantwortlich</div>
+                    <div class="fw-semibold">@(string.IsNullOrEmpty(t.Verantwortlich) ? "–" : t.Verantwortlich)</div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <div class="card p-3 text-center">
+                    <div class="text-muted small">Erledigen bis</div>
+                    <div class="fw-semibold @(t.Erledigt ? "" : (diff < 0 ? "text-danger" : (diff <= 7 ? "text-warning" : "")))">
+                        @t.ErledigenBis.ToString("dd. MMMM yyyy")
+                        @if (!t.Erledigt && diff < 0)
+                        {
+                            <br /><small>@Math.Abs(diff)d überfällig</small>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <div class="card p-3 text-center">
+                    <div class="text-muted small">Status</div>
+                    <div>
+                        @if (t.Erledigt)
+                        {
+                            <span class="badge badge-erledigt">Erledigt</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-offen">Offen</span>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <div class="card p-3 text-center">
+                    <div class="text-muted small">Klasse / Gruppe</div>
+                    <div class="fw-semibold">
+                        @if (!string.IsNullOrEmpty(t.Klasse))
+                        {
+                            <span class="badge bg-light text-dark border me-1">@t.Klasse</span>
+                        }
+                        @if (!string.IsNullOrEmpty(t.Gruppe))
+                        {
+                            <span class="badge bg-secondary">@t.Gruppe</span>
+                        }
+                        @if (string.IsNullOrEmpty(t.Klasse) && string.IsNullOrEmpty(t.Gruppe))
+                        {
+                            <span>–</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(t.Beschreibung))
+        {
+            <div class="card mb-4">
+                <div class="card-header-cms">Beschreibung</div>
+                <div class="card-body">@t.Beschreibung</div>
+            </div>
+        }
+
+        @if (t.Files.Any())
+        {
+            <div class="card mb-4">
+                <div class="card-header-cms"><i class="bi bi-paperclip me-2"></i>Dateien (@t.Files.Count)</div>
+                <div class="card-body">
+                    @foreach (var f in t.Files)
+                    {
+                        var ext = System.IO.Path.GetExtension(f.OriginalName).ToLowerInvariant();
+                        string icon;
+                        if (ext == ".pdf") icon = "bi-file-pdf text-danger";
+                        else if (ext == ".docx" || ext == ".doc") icon = "bi-file-word text-primary";
+                        else if (ext == ".xlsx" || ext == ".xls") icon = "bi-file-excel text-success";
+                        else if (ext == ".pptx" || ext == ".ppt") icon = "bi-file-ppt text-warning";
+                        else if (ext is ".jpg" or ".jpeg" or ".png" or ".gif") icon = "bi-file-image text-info";
+                        else icon = "bi-file-earmark";
+                        <div class="file-item">
+                            <i class="bi @icon fs-5"></i>
+                            <a asp-page="/Todos/File" asp-route-id="@t.Id" asp-route-fileId="@f.Id"
+                               class="text-decoration-none flex-grow-1">@f.OriginalName</a>
+                            <span class="text-muted small">@(f.Size / 1024) KB</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <div class="text-muted small mt-3">
+            Erstellt: @t.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+            @if (!string.IsNullOrEmpty(t.CreatedBy)) { <span>von @t.CreatedBy</span> }
+            &nbsp;|&nbsp;
+            Geändert: @t.UpdatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+            @if (!string.IsNullOrEmpty(t.UpdatedBy)) { <span>von @t.UpdatedBy</span> }
+        </div>
+
+        @if (t.History.Any())
+        {
+            <div class="card border-0 shadow-sm mt-4">
+                <div class="card-header bg-light py-2">
+                    <small class="text-muted fw-semibold">
+                        <i class="bi bi-clock-history me-1"></i>Änderungsprotokoll
+                    </small>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-sm mb-0">
+                        <tbody>
+                            @foreach (var log in t.History.OrderByDescending(l => l.Timestamp))
+                            {
+                                <tr>
+                                    <td class="text-muted small ps-3" style="width:150px;">
+                                        @log.Timestamp.ToLocalTime().ToString("dd.MM.yy HH:mm")
+                                    </td>
+                                    <td class="small fw-semibold" style="width:120px;">@log.User</td>
+                                    <td class="small">@log.Aktion</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+    </div>
+}

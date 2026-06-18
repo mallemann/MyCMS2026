@@ -1,0 +1,63 @@
+@page
+@model MyCMS2026.Pages.Admin.SiteConfigModel
+@{
+    ViewData["Title"] = "Site-Konfiguration";
+}
+<div>
+    <div class="cms-page-header">
+        <h1 class="cms-page-title"><i class="bi bi-sliders me-2 fs-4"></i>Site-Konfiguration</h1>
+    </div>
+    <div class="cms-page-body" style="max-width:700px;">
+    @if (!string.IsNullOrEmpty(Model.Message))
+    {
+        <div class="alert alert-@(Model.IsError ? "danger" : "success") alert-dismissible">
+            @Model.Message
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    <form method="post">
+        <div class="mb-3">
+            <label class="form-label fw-semibold">Site-Titel</label>
+            <input asp-for="Config.Title" class="form-control" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-semibold">Status</label>
+            <select asp-for="Config.Status" class="form-select">
+                <option value="Active">Active</option>
+                <option value="Maintenance">Maintenance</option>
+                <option value="Offline">Offline</option>
+            </select>
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-semibold">Footer-Text</label>
+            <input asp-for="Config.FooterText" class="form-control" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-semibold">Logo-URL</label>
+            <input asp-for="Config.LogoUrl" class="form-control" placeholder="/images/logo.png" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-semibold">HTTP-Host</label>
+            <input asp-for="Config.HTTPHost" class="form-control" />
+        </div>
+        <div class="mb-3 form-check">
+            <input asp-for="Config.ForceHTTPS" type="checkbox" class="form-check-input" />
+            <label asp-for="Config.ForceHTTPS" class="form-check-label">HTTPS erzwingen</label>
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-semibold">Maximale Menü-Ebenen</label>
+            <input asp-for="Config.MaximumMenuLevels" type="number" class="form-control" />
+        </div>
+        <hr />
+        <h6>Weekly Mail</h6>
+        <div class="mb-3 form-check">
+            <input asp-for="Config.WeeklyMailEnabled" type="checkbox" class="form-check-input" />
+            <label asp-for="Config.WeeklyMailEnabled" class="form-check-label">
+                Weekly Mail automatisch versenden (jeden Montag 07:00)
+            </label>
+        </div>
+        <button type="submit" class="btn btn-cms">Speichern</button>
+        <a asp-page="/Index" class="btn btn-outline-secondary ms-2">Abbrechen</a>
+    </form>
+    </div>@* /cms-page-body *@
+</div>

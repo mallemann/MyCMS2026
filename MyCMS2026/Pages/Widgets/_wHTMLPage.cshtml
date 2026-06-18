@@ -1,0 +1,46 @@
+@model MyCMS2026.Pages.Page.PageIndexModel
+@using System.IO
+@*
+    Widget: wHTMLPage
+    Zeigt eine statische HTML-Seite an.
+    Dateiname = NavEntry-ID + ".html" unter App_Data/pages/ (kein ConfigString nötig)
+*@
+@inject IWebHostEnvironment Env
+
+@{
+    // Dateiname = NavEntry-ID + ".html" (kein ConfigString nötig)
+    var pageFile = Model.NavItem!.Id + ".html";
+    var path = System.IO.Path.Combine(Env.ContentRootPath, "App_Data", "pages", pageFile);
+    var html = System.IO.File.Exists(path) ? System.IO.File.ReadAllText(path) : null;
+}
+
+@if (html != null)
+{
+    @if (Model.HasExtendedAccess)
+    {
+        <div class="mb-2 text-end">
+            <a asp-page="/Admin/EditHtmlPage"
+               asp-route-fileName="@pageFile"
+               asp-route-returnId="@Model.NavItem.Id"
+               class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-pencil me-1"></i>Seite bearbeiten
+            </a>
+        </div>
+    }
+    <div class="cms-html-content">@Html.Raw(html)</div>
+}
+else if (Model.HasExtendedAccess)
+{
+    <div class="alert alert-info d-flex justify-content-between align-items-center">
+        <span>
+            <i class="bi bi-file-earmark-text me-2"></i>
+            Noch kein Inhalt. Datei wird unter <code>App_Data/pages/@pageFile</code> gespeichert.
+        </span>
+        <a asp-page="/Admin/EditHtmlPage"
+           asp-route-fileName="@pageFile"
+           asp-route-returnId="@Model.NavItem.Id"
+           class="btn btn-cms btn-sm ms-3">
+            <i class="bi bi-plus-lg me-1"></i>Seite erstellen
+        </a>
+    </div>
+}

@@ -1,0 +1,270 @@
+@page
+@model MyCMS2026.Pages.Admin.UsersModel
+@inject MyCMS2026.Services.RoleService RoleSvc
+@{
+    ViewData["Title"] = "Benutzerverwaltung";
+    var alleRollen = await RoleSvc.GetAllAsync();
+}
+<div>
+    <div class="cms-page-header">
+        <h1 class="cms-page-title"><i class="bi bi-people me-2 fs-4"></i>Benutzerverwaltung</h1>
+        <button class="btn btn-cms btn-sm" data-bs-toggle="modal" data-bs-target="#modalCreate">
+            <i class="bi bi-person-plus me-1"></i>Neuer Benutzer
+        </button>
+    </div>
+    <div class="cms-page-body">
+
+    @if (!string.IsNullOrEmpty(Model.Message))
+    {
+        <div class="alert alert-@(Model.IsError ? "danger" : "success") alert-dismissible">
+            @Model.Message
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="table-responsive">
+        <table class="table table-hover table-sm align-middle">
+            <thead >
+                <tr>
+                    <th>Benutzername</th>
+                    <th>Kürzel</th>
+                    <th>E-Mail</th>
+                    <th>Rollen</th>
+                    <th>Aktiv</th>
+                    <th>Logins</th>
+                    <th>Letzter Login</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var u in Model.Users)
+                {
+                    <tr>
+                        <td><strong>@u.UserName</strong></td>
+                        <td>@u.Kuerzel</td>
+                        <td>@u.Email</td>
+                        <td>@string.Join(", ", u.Roles)</td>
+                        <td>
+                            @if (u.IsActive)
+                            {
+                                <span class="badge bg-success">Aktiv</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">Inaktiv</span>
+                            }
+                        </td>
+                        <td>@u.LoginCount</td>
+                        <td>@(u.LastLoginAt?.ToString("dd.MM.yyyy HH:mm") ?? "–")</td>
+                        <td class="text-nowrap">
+                            <button class="btn btn-outline-secondary btn-sm"
+                                    title="Bearbeiten"
+                                    onclick="openEdit('@u.UserName','@u.Kuerzel','@u.Email','@string.Join(",", u.Roles)','@u.IsActive')">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-outline-warning btn-sm"
+                                    title="Passwort setzen"
+                                    onclick="openSetPw('@u.UserName')">
+                                <i class="bi bi-key"></i>
+                            </button>
+                            @if (u.UserName != User.Identity!.Name)
+                            {
+                                <form method="post" asp-page-handler="Delete" class="d-inline">
+                                    <input type="hidden" name="userName" value="@u.UserName" />
+                                    <button type="button" class="btn btn-outline-danger btn-sm"
+                                            title="Löschen"
+                                            onclick="cmsConfirmDelete(this.closest('form'), 'Benutzer «@u.UserName» wirklich löschen?')">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    </div>@* /cms-page-body *@
+</div>
+
+
+<div class="modal fade" id="modalCreate" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" asp-page-handler="Create">
+                <div class="modal-header"><h5 class="modal-title">Neuer Benutzer</h5></div>
+                <div class="modal-body">
+                    <div class="mb-2"><label class="form-label">Benutzername</label>
+                        <input name="newUserName" class="form-control" required /></div>
+                    <div class="mb-2"><label class="form-label">Kürzel</label>
+                        <input name="newKuerzel" class="form-control" /></div>
+                    <div class="mb-2"><label class="form-label">E-Mail</label>
+                        <input name="newEmail" type="email" class="form-control" /></div>
+                    <div class="mb-2"><label class="form-label">Passwort</label>
+                        <input name="newPassword" type="password" class="form-control" required /></div>
+                    <div class="mb-2">
+                        <label class="form-label">Rollen</label>
+                        <div class="border rounded p-2">
+                            @foreach (var r in alleRollen)
+                            {
+                                <div class="form-check">
+                                    <input class="form-check-input new-role-check" type="checkbox"
+                                           value="@r.Name" id="newRole_@r.Id"
+                                           @(r.Name == "Member" ? "checked" : "") />
+                                    <label class="form-check-label" for="newRole_@r.Id">
+                                        <strong>@r.Name</strong>
+                                        @if (!string.IsNullOrEmpty(r.Description))
+                                        {
+                                            <span class="text-muted small ms-1">– @r.Description</span>
+                                        }
+                                    </label>
+                                </div>
+                            }
+                        </div>
+                        <input type="hidden" id="newRolesHidden" name="newRoles" value="Member" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-cms">Erstellen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+<div class="modal fade" id="modalEdit" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" asp-page-handler="Update">
+                <div class="modal-header"><h5 class="modal-title">Benutzer bearbeiten</h5></div>
+                <div class="modal-body">
+                    <input type="hidden" id="editOrigName" name="originalUserName" />
+                    <div class="mb-2"><label class="form-label">Benutzername</label>
+                        <input id="editUserName" name="updUserName" class="form-control" required /></div>
+                    <div class="mb-2"><label class="form-label">Kürzel</label>
+                        <input id="editKuerzel" name="updKuerzel" class="form-control" /></div>
+                    <div class="mb-2"><label class="form-label">E-Mail</label>
+                        <input id="editEmail" name="updEmail" type="email" class="form-control" /></div>
+                    <div class="mb-2"><label class="form-label">Neues Passwort (leer = nicht ändern)</label>
+                        <input name="updPassword" type="password" class="form-control" /></div>
+                    <div class="mb-2">
+                        <label class="form-label">Rollen</label>
+                        <div class="border rounded p-2">
+                            @foreach (var r in alleRollen)
+                            {
+                                <div class="form-check">
+                                    <input class="form-check-input edit-role-check" type="checkbox"
+                                           value="@r.Name" id="editRole_@r.Id" />
+                                    <label class="form-check-label" for="editRole_@r.Id">
+                                        <strong>@r.Name</strong>
+                                        @if (!string.IsNullOrEmpty(r.Description))
+                                        {
+                                            <span class="text-muted small ms-1">– @r.Description</span>
+                                        }
+                                    </label>
+                                </div>
+                            }
+                        </div>
+                        <input type="hidden" id="editRolesHidden" name="updRoles" />
+                    </div>
+                    <div class="form-check mt-2">
+                        @* Checkbox zuerst (checked → "true" gewinnt); hidden liefert "false" wenn unchecked *@
+                        <input id="editActive" name="updActive" type="checkbox" class="form-check-input" value="true" />
+                        <input type="hidden" name="updActive" value="false" />
+                        <label class="form-check-label" for="editActive">Aktiv</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-cms">Speichern</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@* Modal: Passwort setzen *@
+<div class="modal fade" id="modalSetPw" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <form method="post" asp-page-handler="SetPassword">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-key me-1"></i>Passwort setzen</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted mb-2">
+                        Benutzer: <strong id="setPwUserLabel"></strong>
+                    </p>
+                    <input type="hidden" id="setPwUserName" name="setUserName" />
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold">Neues Passwort</label>
+                        <input id="setPwPassword" name="setNewPassword" type="text"
+                               class="form-control" placeholder="mind. 8 Zeichen" required />
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="setPwShow"
+                               onchange="document.getElementById('setPwPassword').type = this.checked ? 'text' : 'password'" />
+                        <label class="form-check-label small" for="setPwShow">Anzeigen</label>
+                    </div>
+                    @if (Model.Users.Any(u => string.IsNullOrEmpty(u.Email)))
+                    {
+                        <div class="alert alert-warning py-1 mt-2 small">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            Benutzer ohne E-Mail erhalten keine Benachrichtigung.
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-warning btn-sm">
+                        <i class="bi bi-key me-1"></i>Setzen &amp; Benachrichtigen
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+// Checkboxen → hidden field sync
+function syncRoles(checkClass, hiddenId) {
+    var checks = document.querySelectorAll('.' + checkClass + ':checked');
+    var vals = Array.from(checks).map(c => c.value);
+    document.getElementById(hiddenId).value = vals.join(',');
+}
+
+document.querySelectorAll('.new-role-check').forEach(cb => {
+    cb.addEventListener('change', () => syncRoles('new-role-check', 'newRolesHidden'));
+});
+document.querySelectorAll('.edit-role-check').forEach(cb => {
+    cb.addEventListener('change', () => syncRoles('edit-role-check', 'editRolesHidden'));
+});
+
+function openEdit(name, kuerzel, email, roles, active) {
+    document.getElementById('editOrigName').value = name;
+    document.getElementById('editUserName').value = name;
+    document.getElementById('editKuerzel').value = kuerzel;
+    document.getElementById('editEmail').value = email;
+    document.getElementById('editActive').checked = active === 'True';
+
+    var roleList = roles ? roles.split(',') : [];
+    document.querySelectorAll('.edit-role-check').forEach(cb => {
+        cb.checked = roleList.includes(cb.value);
+    });
+    syncRoles('edit-role-check', 'editRolesHidden');
+
+    new bootstrap.Modal(document.getElementById('modalEdit')).show();
+}
+
+function openSetPw(name) {
+    document.getElementById('setPwUserName').value = name;
+    document.getElementById('setPwUserLabel').textContent = name;
+    document.getElementById('setPwPassword').value = '';
+    new bootstrap.Modal(document.getElementById('modalSetPw')).show();
+}
+</script>
+}

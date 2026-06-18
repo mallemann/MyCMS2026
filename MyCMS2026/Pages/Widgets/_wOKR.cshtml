@@ -1,0 +1,83 @@
+@model MyCMS2026.Pages.Page.PageIndexModel
+@using MyCMS2026.Services
+@using MyCMS2026.Models
+@inject OkrService OkrSvc
+@{
+    var isAdmin = User.IsInRole("Administrator");
+    var pageId  = Model.Id;
+
+    // Jahr aus Query-String, Fallback auf aktuelles Jahr
+    var allYears    = await OkrSvc.GetYearsAsync();
+    var currentYear = DateTime.Now.Year;
+    if (int.TryParse(Context.Request.Query["okrYear"].ToString(), out int qYear) && qYear > 0)
+        currentYear = qYear;
+
+    // Sicherstellen, dass das gewählte Jahr in der Liste ist (z.B. bei aktuellem Jahr ohne Daten)
+    if (!allYears.Contains(currentYear)) allYears.Add(currentYear);
+    allYears = allYears.OrderByDescending(y => y).ToList();
+
+    var objectives = (await OkrSvc.GetByYearAsync(currentYear))
+        .Where(o => o.Status == "aktiv")
+        .ToList();
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-1">
+        @foreach (var y in allYears)
+        {
+            var active = y == currentYear;
+            <a href="?Id=@pageId&okrYear=@y"
+               class="btn btn-sm @(active ? "btn-cms" : "btn-outline-secondary")">
+                @y
+            </a>
+        }
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <span class="text-muted small">@objectives.Count aktive Objective(s)</span>
+        <a asp-page="/Okr/Index" asp-route-year="@currentYear" class="btn btn-outline-secondary btn-sm">Verwalten</a>
+    </div>
+</div>
+
+@foreach (var obj in objectives)
+{
+    var objProgress = obj.KeyResults.Count > 0
+        ? obj.KeyResults.Average(kr => kr.ProgressPercent)
+        : 0.0;
+    string progressColor;
+    if (objProgress >= 80)      progressColor = "success";
+    else if (objProgress >= 50) progressColor = "warning";
+    else                        progressColor = "danger";
+
+    <div class="mb-4">
+        <div class="d-flex justify-content-between align-items-start mb-1">
+            <div class="fw-semibold small">@obj.Text</div>
+            <strong class="small ms-2">@objProgress.ToString("0.#")%</strong>
+        </div>
+        <div class="progress okr-progress-bar mb-2">
+            <div class="progress-bar bg-@progressColor" style="width:@objProgress%"></div>
+        </div>
+
+        @foreach (var kr in obj.KeyResults)
+        {
+            string krColor;
+            if (kr.ProgressPercent >= 80)      krColor = "success";
+            else if (kr.ProgressPercent >= 50) krColor = "warning";
+            else                               krColor = "danger";
+            <div class="d-flex align-items-center gap-2 mb-1 ms-2">
+                <span class="small text-muted text-truncate flex-grow-1" title="@kr.Text">@kr.Text</span>
+                <div class="progress" style="width:80px;height:8px;flex-shrink:0">
+                    <div class="progress-bar bg-@krColor" style="width:@kr.ProgressPercent%"></div>
+                </div>
+                <span class="small text-muted" style="min-width:36px;text-align:right">@kr.ProgressPercent.ToString("0.#")%</span>
+            </div>
+        }
+    </div>
+}
+
+@if (!objectives.Any())
+{
+    <div class="text-center text-muted py-3">
+        <i class="bi bi-bullseye d-block mb-1 fs-4"></i>
+        Keine aktiven OKRs für @currentYear.
+    </div>
+}

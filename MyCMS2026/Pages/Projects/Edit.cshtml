@@ -1,0 +1,119 @@
+@page
+@model MyCMS2026.Pages.Projects.ProjectEditModel
+@{
+    ViewData["Title"] = Model.IsNew ? "Neues Projekt" : "Projekt bearbeiten";
+}
+
+<div>
+    <div class="cms-page-header d-flex justify-content-between align-items-center">
+        <h1 class="cms-page-title">
+            <i class="bi bi-kanban me-2 fs-4"></i>
+            @(Model.IsNew ? "Neues Projekt" : $"Projekt bearbeiten")
+        </h1>
+        @if (!Model.IsNew)
+        {
+            <a asp-page="Detail" asp-route-id="@Model.Input.Id" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i>Zurück
+            </a>
+        }
+        else
+        {
+            <a asp-page="Index" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i>Zurück
+            </a>
+        }
+    </div>
+    <div class="cms-page-body" style="max-width:800px">
+
+        @if (!string.IsNullOrEmpty(Model.Error))
+        {
+            <div class="alert alert-danger">@Model.Error</div>
+        }
+
+        <form method="post">
+            <input type="hidden" asp-for="Input.Id" />
+            <input type="hidden" asp-for="Input.ProjectNr" />
+            <input type="hidden" asp-for="Input.CreatedAt" />
+            <input type="hidden" asp-for="Input.CreatedBy" />
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Projektname <span class="text-danger">*</span></label>
+                <input asp-for="Input.Name" class="form-control" required />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Beschreibung</label>
+                <textarea asp-for="Input.Beschreibung" class="form-control" rows="3"></textarea>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Status</label>
+                    <select asp-for="Input.Status" class="form-select">
+                        @foreach (var s in MyCMS2026.Models.Project.StatusOptions)
+                        {
+                            <option value="@s">@s</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label fw-semibold">Projektleiter</label>
+                    @if (Model.UserNames.Any())
+                    {
+                        <input asp-for="Input.Projektleiter" class="form-control" list="user-list" />
+                        <datalist id="user-list">
+                            @foreach (var u in Model.UserNames)
+                            {
+                                <option value="@u" />
+                            }
+                        </datalist>
+                    }
+                    else
+                    {
+                        <input asp-for="Input.Projektleiter" class="form-control" />
+                    }
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Startdatum</label>
+                    <input asp-for="Input.StartDatum" type="date" class="form-control" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Enddatum</label>
+                    <input asp-for="Input.EndDatum" type="date" class="form-control" />
+                </div>
+            </div>
+
+            <hr />
+            <h6 class="fw-semibold mb-3"><i class="bi bi-shield-lock me-1 text-muted"></i>Zugriffsberechtigungen</h6>
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Lesen (Rolle)</label>
+                    <input asp-for="Input.LeseRolle" class="form-control" />
+                    <div class="form-text">Welche Rolle darf dieses Projekt sehen? Leer = alle.</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Bearbeiten (Rolle)</label>
+                    <input asp-for="Input.BearbeitenRolle" class="form-control" />
+                    <div class="form-text">Welche Rolle darf Journal/etc. bearbeiten? Leer = niemand (nur Admin).</div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-cms">
+                    <i class="bi bi-check-lg me-1"></i>Speichern
+                </button>
+                @if (!Model.IsNew)
+                {
+                    <a asp-page="Detail" asp-route-id="@Model.Input.Id" class="btn btn-outline-secondary">Abbrechen</a>
+                }
+                else
+                {
+                    <a asp-page="Index" class="btn btn-outline-secondary">Abbrechen</a>
+                }
+            </div>
+        </form>
+    </div>
+</div>

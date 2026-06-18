@@ -1,0 +1,244 @@
+@page
+@model MyCMS2026.Pages.Meetings.MeetingEditModel
+@inject MyCMS2026.Services.KlassenService KlassenSvc
+@inject MyCMS2026.Services.GruppenService GruppenSvc
+@{
+    ViewData["Title"] = string.IsNullOrEmpty(Model.Meeting.Id) ? "Neues Meeting" : "Meeting bearbeiten";
+    var isNew = string.IsNullOrEmpty(Model.Meeting.Id);
+    var meetingKlassen = await KlassenSvc.GetKlassenAsync("meetings");
+    var alleGruppen = await GruppenSvc.GetAllAsync();
+}
+
+<div>
+    <div class="cms-page-header d-flex justify-content-between align-items-center">
+        <h1 class="cms-page-title">
+            <i class="bi bi-calendar-event me-2 fs-4"></i>
+            @(isNew ? "Neues Meeting" : $"Meeting #{Model.Meeting.MeetingNr} bearbeiten")
+        </h1>
+        @if (!string.IsNullOrEmpty(Model.ReturnPageId))
+        {
+            <a asp-page="/Page/Index" asp-route-id="@Model.ReturnPageId" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i>Zurück
+            </a>
+        }
+        else
+        {
+            <a asp-page="Index" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i>Zurück
+            </a>
+        }
+    </div>
+    <div class="cms-page-body" style="max-width:900px">
+
+        @if (!string.IsNullOrEmpty(Model.Error))
+        {
+            <div class="alert alert-danger">@Model.Error</div>
+        }
+
+        @* Dateilöschen-Formulare ausserhalb des Hauptformulars (verschachtelte forms = Bug) *@
+        @foreach (var f in Model.Meeting.Files)
+        {
+            <form id="delMeetingFile-@f.Id" method="post" asp-page-handler="DeleteFile" style="display:none">
+                <input type="hidden" name="id" value="@Model.Meeting.Id" />
+                <input type="hidden" name="fileId" value="@f.Id" />
+            </form>
+        }
+
+        <form method="post" enctype="multipart/form-data">
+            <input type="hidden" asp-for="Meeting.Id" />
+            <input type="hidden" asp-for="Meeting.MeetingNr" />
+            @* Gruppe wird unten als editierbares Feld angezeigt *@
+            <input type="hidden" name="ReturnProjectId" value="@Model.ReturnProjectId" />
+            <input type="hidden" name="ReturnPageId" value="@Model.ReturnPageId" />
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Thema <span class="text-danger">*</span></label>
+                <input asp-for="Meeting.Thema" class="form-control" required />
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Leitung</label>
+                    @if (Model.Kuerzel.Any())
+                    {
+                        <input asp-for="Meeting.Leitung" class="form-control" list="kuerzel-list" />
+                        <datalist id="kuerzel-list">
+                            @foreach (var k in Model.Kuerzel)
+                            {
+                                <option value="@k" />
+                            }
+                        </datalist>
+                    }
+                    else
+                    {
+                        <input asp-for="Meeting.Leitung" class="form-control" />
+                    }
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Datum</label>
+                    <input asp-for="Meeting.Datum" type="date" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Status</label>
+                    <select asp-for="Meeting.Status" class="form-select">
+                        @foreach (var s in MyCMS2026.Models.Meeting.StatusOptions)
+                        {
+                            <option value="@s">@s</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Klasse</label>
+                    <select asp-for="Meeting.Klasse" class="form-select">
+                        <option value="">– keine –</option>
+                        @foreach (var k in meetingKlassen)
+                        {
+                            <option value="@k">@k</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Gruppe</label>
+                    <input asp-for="Meeting.Gruppe" class="form-control" list="gruppenList" placeholder="– keine –" autocomplete="off" />
+                    <datalist id="gruppenList">
+                        @foreach (var g in alleGruppen) { <option value="@g" /> }
+                    </datalist>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Inhaltstyp</label>
+                    <select asp-for="Meeting.ContentType" class="form-select">
+                        <option value="Text">Rich-Text (Traktanden / Protokoll)</option>
+                        <option value="Files">Nur Dateiliste</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Beschreibung / Traktanden</label>
+                <textarea asp-for="Meeting.Beschreibung" class="form-control" rows="3"></textarea>
+            </div>
+
+            <div class="mb-3" id="contentBlock">
+                <label class="form-label fw-semibold">Protokoll / Inhalt (Rich-Text)</label>
+                <textarea id="meetingContent" asp-for="Meeting.Content" style="display:none"></textarea>
+            </div>
+
+            @* Bestehende Dateien *@
+            @if (Model.Meeting.Files.Any())
+            {
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Angehängte Dateien</label>
+                    <ul class="list-group list-group-flush">
+                        @foreach (var f in Model.Meeting.Files)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <span>
+                                    <i class="bi bi-file-earmark me-1"></i>
+                                    <a asp-page="/Meetings/File" asp-route-id="@Model.Meeting.Id" asp-route-fileId="@f.Id">@f.OriginalName</a>
+                                    <span class="text-muted small ms-1">(@(f.Size / 1024) KB)</span>
+                                </span>
+                                <button type="button" class="btn btn-outline-danger btn-sm"
+                                        onclick="cmsConfirmDelete('delMeetingFile-@f.Id', 'Datei @f.OriginalName.Replace("'", "\\'") löschen?')">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+
+            @if (Model.Projects.Any())
+            {
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Projekt</label>
+                    <select asp-for="Meeting.ProjectId" class="form-select">
+                        <option value="">– kein Projekt –</option>
+                        @foreach (var proj in Model.Projects)
+                        {
+                            <option value="@proj.Id">@proj.Name</option>
+                        }
+                    </select>
+                </div>
+            }
+
+            <div class="mb-4">
+                <label class="form-label fw-semibold">Dateien hochladen</label>
+                <input type="file" name="UploadedFiles" class="form-control" multiple />
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-cms">
+                    <i class="bi bi-floppy me-1"></i>Speichern
+                </button>
+                @if (!string.IsNullOrEmpty(Model.ReturnPageId))
+                {
+                    <a asp-page="/Page/Index" asp-route-id="@Model.ReturnPageId" class="btn btn-outline-secondary">Abbrechen</a>
+                }
+                else if (!string.IsNullOrEmpty(Model.ReturnProjectId))
+                {
+                    <a asp-page="/Projects/Detail" asp-route-id="@Model.ReturnProjectId" asp-route-tab="meetings"
+                       class="btn btn-outline-secondary">Abbrechen</a>
+                }
+                else
+                {
+                    <a asp-page="Index" class="btn btn-outline-secondary">Abbrechen</a>
+                }
+            </div>
+        </form>
+
+    </div>
+</div>
+
+@section Scripts {
+<link href="https://cdnjs.cloudflare.com/ajax/libs/summernote/0.8.20/summernote-bs5.min.css" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/summernote/0.8.20/summernote-bs5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/summernote/0.8.20/lang/summernote-de-DE.min.js"></script>
+<script>
+$(document).ready(function () {
+    var contentType = '@Model.Meeting.ContentType';
+
+    function toggleContent() {
+        var sel = $('[name="Meeting.ContentType"]').val();
+        $('#contentBlock').toggle(sel === 'Text');
+    }
+    toggleContent();
+    $('[name="Meeting.ContentType"]').on('change', toggleContent);
+
+    if (contentType !== 'Files') {
+        $('#meetingContent').summernote({
+            lang: 'de-DE',
+            height: 300,
+            toolbar: [
+                ['style', ['style']],
+                ['font',  ['bold', 'italic', 'underline', 'clear']],
+                ['para',  ['ul', 'ol', 'paragraph']],
+                ['table', ['table']],
+                ['insert',['link', 'hr']],
+                ['view',  ['fullscreen', 'codeview']]
+            ]
+        });
+    }
+
+    // Fix 1: Summernote generiert data-toggle (BS4) statt data-bs-toggle (BS5)
+    $('.note-toolbar [data-toggle="dropdown"]')
+        .attr('data-bs-toggle', 'dropdown')
+        .removeAttr('data-toggle');
+
+    // Fix 2: Fokus/Selektion bei Dropdown-Item-Klick erhalten
+    $(document).on('mousedown', '.note-toolbar .dropdown-menu .dropdown-item', function (e) {
+        e.preventDefault();
+    });
+
+    $('form').on('submit', function () {
+        if ($('#meetingContent').data('summernote')) {
+            $('#meetingContent').val($('#meetingContent').summernote('code'));
+            $('#meetingContent').show();
+        }
+    });
+});
+</script>
+}
