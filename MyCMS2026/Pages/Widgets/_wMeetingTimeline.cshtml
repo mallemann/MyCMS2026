@@ -1,0 +1,171 @@
+@model MyCMS2026.Pages.Page.PageIndexModel
+@using MyCMS2026.Services
+@using MyCMS2026.Models
+@inject MeetingService MeetingSvc
+@inject WeeklyMailService WeeklyMailSvc
+@inject KlassenService KlassenSvc
+@{
+    var userName = User.Identity?.Name ?? "";
+
+    // Gruppen des aktuellen Benutzers aus Reporting Settings holen
+    var config     = await WeeklyMailSvc.GetConfigAsync();
+    var recipient  = config.Recipients.FirstOrDefault(r =>
+        string.Equals(r.UserId, userName, StringComparison.OrdinalIgnoreCase));
+    var allowedGruppen = recipient?.AllowedGruppen ?? new List<string>();
+
+    // Meetings laden und filtern
+    var isAdmin = User.IsInRole("Administrator");
+    var all = await MeetingSvc.GetAllAsync();
+    List<Meeting> meetings;
+    if (isAdmin && !allowedGruppen.Any())
+    {
+        // Admin ohne Gruppen-Zuordnung → alles anzeigen
+        meetings = all.OrderByDescending(m => m.Datum).ToList();
+    }
+    else if (allowedGruppen.Any())
+    {
+        meetings = all
+            .Where(m => string.IsNullOrEmpty(m.Gruppe) ||
+                        allowedGruppen.Contains(m.Gruppe, StringComparer.OrdinalIgnoreCase))
+            .OrderByDescending(m => m.Datum)
+            .ToList();
+    }
+    else
+    {
+        // Kein Eintrag in Reporting Settings → nichts anzeigen
+        meetings = new List<Meeting>();
+    }
+
+    var meetingKlassen = await KlassenSvc.GetKlassenAsync("meetings");
+}
+
+@* Klasse/Status-Filter *@
+<div class="d-flex flex-wrap gap-2 mb-3">
+    <select id="tlFilterKlasse" class="form-select form-select-sm" style="width:auto;">
+        <option value="">Alle Klassen</option>
+        @foreach (var k in meetingKlassen)
+        {
+            <option value="@k">@k</option>
+        }
+    </select>
+    <select id="tlFilterStatus" class="form-select form-select-sm" style="width:auto;">
+        <option value="">Alle Status</option>
+        <option value="Geplant">Geplant</option>
+        <option value="Abgeschlossen">Abgeschlossen</option>
+        <option value="Abgesagt">Abgesagt</option>
+    </select>
+</div>
+
+@if (!meetings.Any())
+{
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle me-2"></i>
+        @if (!allowedGruppen.Any())
+        {
+            <span>Keine Gruppen zugeordnet. Bitte Administrator kontaktieren.</span>
+        }
+        else
+        {
+            <span>Keine Meetings für die zugeordneten Gruppen (@string.Join(", ", allowedGruppen)).</span>
+        }
+    </div>
+}
+else
+{
+    <div class="timeline" id="tlTimeline">
+        @foreach (var m in meetings)
+        {
+            string badgeClass;
+            if      (m.Status == "Abgeschlossen") badgeClass = "bg-success";
+            else if (m.Status == "Abgesagt")      badgeClass = "bg-danger";
+            else                                   badgeClass = "bg-primary";
+
+            <div class="timeline-item" data-klasse="@m.Klasse" data-status="@m.Status">
+                <div class="timeline-marker">
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-line"></div>
+                </div>
+                <div class="timeline-content">
+                    <div class="timeline-date">
+                        <i class="bi bi-calendar-event me-1"></i>@m.Datum.ToString("dd. MMMM yyyy")
+                        <span class="badge @badgeClass ms-2">@m.Status</span>
+                        @if (!string.IsNullOrEmpty(m.Klasse))
+                        {
+                            <span class="badge bg-secondary ms-1">@m.Klasse</span>
+                        }
+                        @if (!string.IsNullOrEmpty(m.Gruppe))
+                        {
+                            <span class="badge bg-light text-dark border ms-1">@m.Gruppe</span>
+                        }
+                    </div>
+                    <div class="timeline-title">
+                        <a asp-page="/Meetings/Detail" asp-route-id="@m.Id" asp-route-from="timeline"
+                           class="text-decoration-none">@m.Thema</a>
+                    </div>
+                    @if (!string.IsNullOrEmpty(m.Leitung))
+                    {
+                        <div class="text-muted small"><i class="bi bi-person me-1"></i>@m.Leitung</div>
+                    }
+                    @if (!string.IsNullOrEmpty(m.Beschreibung))
+                    {
+                        <div class="text-muted small mt-1">
+                            @(m.Beschreibung.Length > 120 ? m.Beschreibung[..120] + "…" : m.Beschreibung)
+                        </div>
+                    }
+                    @if (m.Files.Any())
+                    {
+                        <div class="mt-1 small text-muted">
+                            <i class="bi bi-paperclip me-1"></i>@m.Files.Count Datei(en)
+                        </div>
+                    }
+                    <div class="mt-2">
+                        <a asp-page="/Meetings/Detail" asp-route-id="@m.Id" asp-route-from="timeline"
+                           class="btn btn-sm btn-cms">
+                            <i class="bi bi-eye me-1"></i>Öffnen
+                        </a>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@if (allowedGruppen.Any())
+{
+    <div class="text-muted small mt-2">
+        <i class="bi bi-filter me-1"></i>Gruppen: @string.Join(", ", allowedGruppen)
+        · @meetings.Count Meeting(s)
+    </div>
+}
+
+<script>
+(function () {
+    const FILTER_KEY = 'mycms_timeline_filter';
+
+    function applyFilter() {
+        const klasse = document.getElementById('tlFilterKlasse').value;
+        const status = document.getElementById('tlFilterStatus').value;
+        sessionStorage.setItem(FILTER_KEY, JSON.stringify({ klasse, status }));
+        document.querySelectorAll('#tlTimeline .timeline-item').forEach(function (item) {
+            const matchK = !klasse || item.dataset.klasse === klasse;
+            const matchS = !status || item.dataset.status === status;
+            item.style.display = matchK && matchS ? '' : 'none';
+        });
+    }
+
+    // Filter wiederherstellen
+    (function restoreFilter() {
+        const saved = sessionStorage.getItem(FILTER_KEY);
+        if (!saved) return;
+        try {
+            const { klasse, status } = JSON.parse(saved);
+            if (klasse) document.getElementById('tlFilterKlasse').value = klasse;
+            if (status) document.getElementById('tlFilterStatus').value = status;
+            applyFilter();
+        } catch (e) {}
+    })();
+
+    document.getElementById('tlFilterKlasse').addEventListener('change', applyFilter);
+    document.getElementById('tlFilterStatus').addEventListener('change', applyFilter);
+})();
+</script>

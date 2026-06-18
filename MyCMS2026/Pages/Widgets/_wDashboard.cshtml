@@ -1,0 +1,525 @@
+@model MyCMS2026.Pages.Page.PageIndexModel
+@using MyCMS2026.Services
+@using MyCMS2026.Models
+@using System.Text.Json
+@inject TodoService    TodoSvc
+@inject MeetingService MeetingSvc
+@inject OkrService     OkrSvc
+@inject WeeklyMailService WeeklyMailSvc
+@{
+    var userName = User.Identity?.Name ?? "";
+    var isAdmin  = User.IsInRole("Administrator");
+
+    // Gruppen des Benutzers aus Reporting Settings
+    var config         = await WeeklyMailSvc.GetConfigAsync();
+    var recipient      = config.Recipients.FirstOrDefault(r =>
+        string.Equals(r.UserId, userName, StringComparison.OrdinalIgnoreCase));
+    var allowedGruppen = recipient?.AllowedGruppen ?? new List<string>();
+    var filterByGroup  = allowedGruppen.Any();
+
+    // Alle Daten laden
+    var allTodos    = await TodoSvc.GetAllAsync();
+    var allMeetings = await MeetingSvc.GetAllAsync();
+    var allOkr      = await OkrSvc.GetAllAsync();
+
+    // Filtern nach Gruppen (Admin ohne Gruppen = alles)
+    bool ShowAll = isAdmin && !filterByGroup;
+
+    List<TodoItem> todos;
+    List<Meeting>  meetings;
+    if (ShowAll)
+    {
+        todos    = allTodos;
+        meetings = allMeetings;
+    }
+    else if (filterByGroup)
+    {
+        todos = allTodos.Where(t =>
+            string.IsNullOrEmpty(t.Gruppe) ||
+            allowedGruppen.Contains(t.Gruppe, StringComparer.OrdinalIgnoreCase)).ToList();
+        meetings = allMeetings.Where(m =>
+            string.IsNullOrEmpty(m.Gruppe) ||
+            allowedGruppen.Contains(m.Gruppe, StringComparer.OrdinalIgnoreCase)).ToList();
+    }
+    else
+    {
+        todos    = new List<TodoItem>();
+        meetings = new List<Meeting>();
+    }
+
+    var today    = DateTime.Today;
+    var offen    = todos.Where(t => !t.Erledigt).ToList();
+    var erledigt = todos.Where(t => t.Erledigt).ToList();
+
+    // ── KPIs ─────────────────────────────────────────────────────────────────
+    var totalMeetings      = meetings.Count;
+    var offeneTasks        = offen.Count;
+    var ueberfaelligeTasks = offen.Count(t => t.ErledigenBis < today);
+    var erledigteTasks     = erledigt.Count;
+    var activeObjs         = allOkr.Where(o => o.KeyResults.Any()).ToList();
+
+    // ── JSON-Daten für Charts ─────────────────────────────────────────────────
+    var taskStatusJson = JsonSerializer.Serialize(new[]
+    {
+        new { label = "Offen",    value = offeneTasks },
+        new { label = "Erledigt", value = erledigteTasks }
+    });
+
+    var meetingStatusJson = JsonSerializer.Serialize(
+        meetings.GroupBy(m => m.Status)
+                .Select(g => new { label = g.Key, value = g.Count() })
+                .OrderBy(x => x.label));
+
+    var months18 = Enumerable.Range(0, 18)
+        .Select(i => today.AddMonths(-17 + i).ToString("yyyy-MM")).ToList();
+    static string MonthLabel(string ym) {
+        var p = ym.Split('-');
+        return new DateTime(int.Parse(p[0]), int.Parse(p[1]), 1).ToString("MMM yy");
+    }
+    var mpm = meetings.Where(m => m.Datum >= today.AddMonths(-17))
+        .GroupBy(m => m.Datum.ToString("yyyy-MM"))
+        .ToDictionary(g => g.Key, g => g.Count());
+    var meetingsPerMonthJson = JsonSerializer.Serialize(new {
+        labels = months18.Select(MonthLabel),
+        data   = months18.Select(m => mpm.GetValueOrDefault(m, 0))
+    });
+
+    var months12 = Enumerable.Range(0, 12)
+        .Select(i => today.AddMonths(-11 + i).ToString("yyyy-MM")).ToList();
+    var tpm = todos.Where(t => t.CreatedAt >= today.AddMonths(-11).ToUniversalTime())
+        .GroupBy(t => t.CreatedAt.ToLocalTime().ToString("yyyy-MM"))
+        .ToDictionary(g => g.Key, g => g.Count());
+    var tasksPerMonthJson = JsonSerializer.Serialize(new {
+        labels = months12.Select(MonthLabel),
+        data   = months12.Select(m => tpm.GetValueOrDefault(m, 0))
+    });
+
+    var byOwner = todos.Where(t => !string.IsNullOrWhiteSpace(t.Verantwortlich))
+        .GroupBy(t => t.Verantwortlich).OrderByDescending(g => g.Count()).Take(10).ToList();
+    var taskByOwnerJson = JsonSerializer.Serialize(new {
+        labels   = byOwner.Select(g => g.Key),
+        offen    = byOwner.Select(g => g.Count(t => !t.Erledigt)),
+        erledigt = byOwner.Select(g => g.Count(t => t.Erledigt))
+    });
+
+    var byKlasse = todos.Where(t => !string.IsNullOrWhiteSpace(t.Klasse))
+        .GroupBy(t => t.Klasse).OrderByDescending(g => g.Count()).ToList();
+    var taskByKlasseJson = JsonSerializer.Serialize(new {
+        labels = byKlasse.Select(g => g.Key),
+        data   = byKlasse.Select(g => g.Count())
+    });
+
+    var mByKlasse = meetings.Where(m => !string.IsNullOrWhiteSpace(m.Klasse))
+        .GroupBy(m => m.Klasse).OrderByDescending(g => g.Count()).ToList();
+    var meetingsByKlasseJson = JsonSerializer.Serialize(new {
+        labels = mByKlasse.Select(g => g.Key),
+        data   = mByKlasse.Select(g => g.Count())
+    });
+
+    var diff = erledigt.Select(t =>
+        (t.UpdatedAt.ToLocalTime().Date - t.ErledigenBis.Date).Days).ToList();
+    var faelligkeitJson = JsonSerializer.Serialize(new {
+        labels = new[] { "Früh (>7d)", "Rechtzeitig (0-7d)", "Leicht spät (1-14d)", "Deutlich spät (>14d)" },
+        data   = new[] {
+            diff.Count(d => d < -7),
+            diff.Count(d => d >= -7 && d <= 0),
+            diff.Count(d => d > 0   && d <= 14),
+            diff.Count(d => d > 14)
+        }
+    });
+
+    var okrProgressJson = JsonSerializer.Serialize(
+        activeObjs.Select(o => new {
+            label    = o.Text,
+            progress = (int)o.KeyResults.Average(kr => kr.ProgressPercent),
+            year     = o.Year,
+            krs      = o.KeyResults.Select(kr => new {
+                text    = kr.Text,
+                current = kr.CurrentValue,
+                target  = kr.TargetValue,
+                pct     = (int)kr.ProgressPercent
+            })
+        }).OrderByDescending(o => o.year).ThenByDescending(o => o.progress));
+
+    var okrByYearJson = JsonSerializer.Serialize(
+        activeObjs.GroupBy(o => o.Year).OrderByDescending(g => g.Key)
+            .Select(g => new {
+                year     = g.Key,
+                progress = (int)g.Average(o => o.KeyResults.Average(kr => kr.ProgressPercent))
+            }));
+}
+
+@if (!filterByGroup && !isAdmin)
+{
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle me-2"></i>Keine Gruppen zugeordnet. Bitte Administrator kontaktieren.
+    </div>
+    return;
+}
+
+@* Stand + Gruppen-Info *@
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <span class="text-muted small"><i class="bi bi-clock me-1"></i>Stand: @DateTime.Now.ToString("dd.MM.yyyy HH:mm")</span>
+    @if (filterByGroup)
+    {
+        <span class="text-muted small"><i class="bi bi-filter me-1"></i>Gruppen: @string.Join(", ", allowedGruppen)</span>
+    }
+</div>
+
+@* ── KPI Cards ── *@
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card p-3 text-center h-100 border-0 shadow-sm">
+            <div class="text-muted small mb-1"><i class="bi bi-people me-1"></i>Meetings total</div>
+            <div class="display-6 fw-bold" style="color:var(--cms-blue);">@totalMeetings</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card p-3 text-center h-100 border-0 shadow-sm">
+            <div class="text-muted small mb-1"><i class="bi bi-check2-square me-1"></i>Offene Tasks</div>
+            <div class="display-6 fw-bold" style="color:var(--cms-blue);">@offeneTasks</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card p-3 text-center h-100 border-0 shadow-sm">
+            <div class="text-muted small mb-1"><i class="bi bi-exclamation-triangle me-1 text-danger"></i>Überfällig</div>
+            <div class="display-6 fw-bold text-danger">@ueberfaelligeTasks</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card p-3 text-center h-100 border-0 shadow-sm">
+            <div class="text-muted small mb-2"><i class="bi bi-bullseye me-1"></i>OKR Fortschritt</div>
+            <div id="wDbOkrKpiYears"></div>
+        </div>
+    </div>
+</div>
+
+@* ── Zeile 1: Tasks Status + Meetings Status + Fälligkeit ── *@
+<div class="row g-3 mb-3">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="fw-semibold mb-3" style="color:var(--cms-blue);"><i class="bi bi-check2-circle me-1"></i>Tasks: Status</h6>
+                <div style="max-height:220px;position:relative;">
+                    <canvas id="wDbChartTaskStatus"></canvas>
+                </div>
+                <div class="d-flex justify-content-center gap-3 mt-2 small text-muted">
+                    <span><i class="bi bi-circle-fill me-1" style="color:var(--cms-blue);"></i>Offen: @offeneTasks</span>
+                    <span><i class="bi bi-circle-fill me-1" style="color:#27ae60;"></i>Erledigt: @erledigteTasks</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="fw-semibold mb-3" style="color:var(--cms-blue);"><i class="bi bi-people me-1"></i>Meetings: Status</h6>
+                <div style="max-height:220px;position:relative;">
+                    <canvas id="wDbChartMeetingStatus"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="fw-semibold mb-3" style="color:var(--cms-blue);"><i class="bi bi-clock-history me-1"></i>Erledigungs-Analyse</h6>
+                <div style="max-height:220px;position:relative;">
+                    <canvas id="wDbChartFaelligkeit"></canvas>
+                </div>
+                <div class="small text-muted mt-1 text-center">Erledigte Tasks: Soll-Ist Vergleich</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* ── Zeile 2: Meetings pro Monat + Tasks pro Monat ── *@
+<div class="row g-3 mb-3">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="fw-semibold mb-3" style="color:var(--cms-blue);"><i class="bi bi-calendar3 me-1"></i>Meetings pro Monat (18 Monate)</h6>
+                <div style="position:relative;height:200px;">
+                    <canvas id="wDbChartMeetingsPerMonth"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="fw-semibold mb-3" style="color:var(--cms-blue);"><i class="bi bi-plus-circle me-1"></i>Tasks angelegt pro Monat (12 Monate)</h6>
+                <div style="position:relative;height:200px;">
+                    <canvas id="wDbChartTasksPerMonth"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* ── Zeile 3: Tasks nach Verantwortlichem + Meetings nach Klasse ── *@
+<div class="row g-3 mb-3">
+    <div class="col-md-7">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="fw-semibold mb-3" style="color:var(--cms-blue);"><i class="bi bi-person me-1"></i>Tasks nach Verantwortlichem</h6>
+                <div style="position:relative;height:240px;">
+                    <canvas id="wDbChartByOwner"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-5">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="fw-semibold mb-3" style="color:var(--cms-blue);"><i class="bi bi-tag me-1"></i>Meetings nach Klasse</h6>
+                <div style="position:relative;height:240px;">
+                    <canvas id="wDbChartMeetingsByKlasse"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* ── Zeile 4: Tasks nach Klasse ── *@
+<div class="row g-3 mb-3">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="fw-semibold mb-3" style="color:var(--cms-blue);"><i class="bi bi-tag me-1"></i>Tasks nach Klasse</h6>
+                <div style="position:relative;height:260px;">
+                    <canvas id="wDbChartTaskByKlasse"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* ── OKR Fortschritt ── *@
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <h6 class="fw-semibold mb-3" style="color:var(--cms-blue);"><i class="bi bi-bullseye me-1"></i>OKR Fortschritt</h6>
+                <div id="wDbOkrProgressBars"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+const BLUE_DARK  = getComputedStyle(document.documentElement).getPropertyValue('--cms-blue').trim()   || '#1a3a5c';
+const BLUE_MID   = getComputedStyle(document.documentElement).getPropertyValue('--cms-accent').trim() || '#2e86c1';
+const BLUE_LIGHT = '#aed6f1';
+const GREEN      = '#27ae60';
+const GREEN_L    = '#a9dfbf';
+const RED        = '#e74c3c';
+const ORANGE     = '#e67e22';
+const YELLOW     = '#f1c40f';
+const PURPLE     = '#8e44ad';
+const TEAL       = '#16a085';
+const GREY       = '#95a5a6';
+const PALETTE    = [BLUE_DARK, GREEN, ORANGE, PURPLE, RED, '#00bcd4', YELLOW, '#e91e63', '#795548', GREY];
+
+Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
+Chart.defaults.font.size   = 12;
+Chart.defaults.color       = '#555';
+
+const taskStatus       = @Html.Raw(taskStatusJson);
+const meetingStatus    = @Html.Raw(meetingStatusJson);
+const meetingsPerMonth = @Html.Raw(meetingsPerMonthJson);
+const tasksPerMonth    = @Html.Raw(tasksPerMonthJson);
+const okrProgress      = @Html.Raw(okrProgressJson);
+const okrByYear        = @Html.Raw(okrByYearJson);
+const taskByOwner      = @Html.Raw(taskByOwnerJson);
+const taskByKlasse     = @Html.Raw(taskByKlasseJson);
+const meetingsByKlasse = @Html.Raw(meetingsByKlasseJson);
+const faelligkeit      = @Html.Raw(faelligkeitJson);
+
+// Tasks Status (Donut)
+new Chart(document.getElementById('wDbChartTaskStatus'), {
+    type: 'doughnut',
+    data: {
+        labels: taskStatus.map(d => d.label),
+        datasets: [{ data: taskStatus.map(d => d.value),
+            backgroundColor: [BLUE_DARK, GREEN],
+            borderWidth: 2, borderColor: '#fff', hoverOffset: 6 }]
+    },
+    options: { responsive: true, maintainAspectRatio: true,
+        plugins: { legend: { position: 'bottom' },
+            tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed}` } } } }
+});
+
+// Meetings Status (Donut)
+const mStatusColors = { 'Geplant': BLUE_MID, 'Abgeschlossen': GREEN, 'Abgesagt': RED };
+new Chart(document.getElementById('wDbChartMeetingStatus'), {
+    type: 'doughnut',
+    data: {
+        labels: meetingStatus.map(d => d.label),
+        datasets: [{ data: meetingStatus.map(d => d.value),
+            backgroundColor: meetingStatus.map(d => mStatusColors[d.label] || GREY),
+            borderWidth: 2, borderColor: '#fff', hoverOffset: 6 }]
+    },
+    options: { responsive: true, maintainAspectRatio: true,
+        plugins: { legend: { position: 'bottom' } } }
+});
+
+// Fälligkeit (Donut)
+new Chart(document.getElementById('wDbChartFaelligkeit'), {
+    type: 'doughnut',
+    data: {
+        labels: faelligkeit.labels,
+        datasets: [{ data: faelligkeit.data,
+            backgroundColor: [TEAL, GREEN, ORANGE, RED],
+            borderWidth: 2, borderColor: '#fff', hoverOffset: 6 }]
+    },
+    options: { responsive: true, maintainAspectRatio: true,
+        plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } } }
+});
+
+// Meetings pro Monat (Bar)
+new Chart(document.getElementById('wDbChartMeetingsPerMonth'), {
+    type: 'bar',
+    data: {
+        labels: meetingsPerMonth.labels,
+        datasets: [{ label: 'Meetings', data: meetingsPerMonth.data,
+            backgroundColor: BLUE_LIGHT, borderColor: BLUE_DARK,
+            borderWidth: 1.5, borderRadius: 4 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#f0f0f0' } },
+                  x: { grid: { display: false } } } }
+});
+
+// Tasks pro Monat (Bar)
+new Chart(document.getElementById('wDbChartTasksPerMonth'), {
+    type: 'bar',
+    data: {
+        labels: tasksPerMonth.labels,
+        datasets: [{ label: 'Neue Tasks', data: tasksPerMonth.data,
+            backgroundColor: GREEN_L, borderColor: GREEN,
+            borderWidth: 1.5, borderRadius: 4 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#f0f0f0' } },
+                  x: { grid: { display: false } } } }
+});
+
+// Tasks nach Verantwortlichem (Horizontal Grouped Bar)
+new Chart(document.getElementById('wDbChartByOwner'), {
+    type: 'bar',
+    data: {
+        labels: taskByOwner.labels,
+        datasets: [
+            { label: 'Offen',    data: taskByOwner.offen,    backgroundColor: BLUE_DARK, borderRadius: 3 },
+            { label: 'Erledigt', data: taskByOwner.erledigt, backgroundColor: GREEN,     borderRadius: 3 }
+        ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+        plugins: { legend: { position: 'bottom' } },
+        scales: { x: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#f0f0f0' } },
+                  y: { grid: { display: false } } } }
+});
+
+// Meetings nach Klasse (Horizontal Bar)
+new Chart(document.getElementById('wDbChartMeetingsByKlasse'), {
+    type: 'bar',
+    data: {
+        labels: meetingsByKlasse.labels,
+        datasets: [{ label: 'Meetings', data: meetingsByKlasse.data,
+            backgroundColor: meetingsByKlasse.labels.map((_, i) => PALETTE[i % PALETTE.length]),
+            borderRadius: 4 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#f0f0f0' } },
+                  y: { grid: { display: false } } } }
+});
+
+// Tasks nach Klasse (Horizontal Bar)
+new Chart(document.getElementById('wDbChartTaskByKlasse'), {
+    type: 'bar',
+    data: {
+        labels: taskByKlasse.labels,
+        datasets: [{ label: 'Tasks', data: taskByKlasse.data,
+            backgroundColor: taskByKlasse.labels.map((_, i) => PALETTE[i % PALETTE.length]),
+            borderRadius: 4 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#f0f0f0' } },
+                  y: { grid: { display: false }, ticks: { font: { size: 12 } } } } }
+});
+
+// OKR KPI Card
+const okrKpiEl = document.getElementById('wDbOkrKpiYears');
+if (!okrByYear.length) {
+    okrKpiEl.innerHTML = '<span class="text-muted small">–</span>';
+} else {
+    okrKpiEl.innerHTML = okrByYear.map(y => {
+        const color = y.progress >= 75 ? '#27ae60' : y.progress >= 40 ? '#e67e22' : '#e74c3c';
+        return `<div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="small text-muted">${y.year}</span>
+            <span class="fw-bold fs-5 ms-3" style="color:${color};">${y.progress}%</span>
+        </div>`;
+    }).join('');
+}
+
+// OKR Fortschritts-Balken
+const okrContainer = document.getElementById('wDbOkrProgressBars');
+if (!okrProgress.length) {
+    okrContainer.innerHTML = '<p class="text-muted small">Keine OKR vorhanden.</p>';
+} else {
+    const byYear = {};
+    okrProgress.forEach(obj => {
+        if (!byYear[obj.year]) byYear[obj.year] = [];
+        byYear[obj.year].push(obj);
+    });
+    Object.keys(byYear).sort((a,b) => b-a).forEach(year => {
+        const yearObjs = byYear[year];
+        const yearAvg  = Math.round(yearObjs.reduce((s,o) => s + o.progress, 0) / yearObjs.length);
+        const yearColor = yearAvg >= 75 ? '#27ae60' : yearAvg >= 40 ? '#e67e22' : '#e74c3c';
+        okrContainer.innerHTML += `
+        <div class="d-flex align-items-center mb-3 mt-2">
+            <span class="fw-bold me-2" style="font-size:15px;color:${BLUE_DARK};">${year}</span>
+            <div class="flex-grow-1 progress me-3" style="height:8px;border-radius:4px;">
+                <div class="progress-bar" style="width:${yearAvg}%;background:${yearColor};border-radius:4px;"></div>
+            </div>
+            <span class="fw-bold" style="color:${yearColor};min-width:40px;text-align:right;">${yearAvg}%</span>
+        </div>`;
+        yearObjs.forEach(obj => {
+            const pct   = obj.progress;
+            const color = pct >= 75 ? '#27ae60' : pct >= 40 ? '#e67e22' : '#e74c3c';
+            const krsHtml = obj.krs.map(kr => {
+                const kpct  = kr.pct;
+                const kcolor = kpct >= 75 ? '#27ae60' : kpct >= 40 ? '#e67e22' : '#e74c3c';
+                return `<div class="mb-2 ms-3">
+                    <div class="mb-1">
+                        <span class="small text-muted">${kr.text}</span>
+                        <span class="small fw-semibold ms-2" style="color:${kcolor};">${kr.current} / ${kr.target} (${kpct}%)</span>
+                    </div>
+                    <div class="progress" style="height:6px;">
+                        <div class="progress-bar" style="width:${kpct}%;background:${kcolor};"></div>
+                    </div>
+                </div>`;
+            }).join('');
+            okrContainer.innerHTML += `
+            <div class="mb-4 ms-3">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="fw-semibold">${obj.label}</span>
+                    <span class="badge ms-2" style="background:${color};font-size:12px;">${pct}%</span>
+                </div>
+                <div class="progress mb-2" style="height:10px;border-radius:5px;">
+                    <div class="progress-bar" style="width:${pct}%;background:${color};border-radius:5px;"></div>
+                </div>
+                ${krsHtml}
+            </div>`;
+        });
+    });
+}
+})();
+</script>

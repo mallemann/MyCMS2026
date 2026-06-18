@@ -62,6 +62,52 @@ app.Use(async (ctx, next) =>
 app.UseStaticFiles();
 app.UseRouting();
 app.UseAuthentication();
+
+// Offline-Sperre: Nicht-Administratoren werden blockiert wenn Status = "Offline"
+app.Use(async (ctx, next) =>
+{
+    var path = ctx.Request.Path.Value ?? "";
+
+    // Account-Seiten und statische Dateien immer durchlassen
+    if (!path.StartsWith("/Account", StringComparison.OrdinalIgnoreCase) &&
+        !path.StartsWith("/css",     StringComparison.OrdinalIgnoreCase) &&
+        !path.StartsWith("/js",      StringComparison.OrdinalIgnoreCase) &&
+        !path.StartsWith("/_",       StringComparison.OrdinalIgnoreCase))
+    {
+        var siteSvc = ctx.RequestServices.GetRequiredService<SiteService>();
+        var site    = await siteSvc.GetAsync();
+
+        if (site.Status == "Offline")
+        {
+            var isAdmin = ctx.User.IsInRole("Administrator");
+            if (!isAdmin)
+            {
+                ctx.Response.StatusCode = 503;
+                ctx.Response.ContentType = "text/html; charset=utf-8";
+                await ctx.Response.WriteAsync(@"<!DOCTYPE html>
+<html lang='de'><head><meta charset='utf-8'/>
+<meta name='viewport' content='width=device-width,initial-scale=1'/>
+<title>Offline</title>
+<link rel='stylesheet' href='/css/mycms.css'/>
+</head><body class='login-body'>
+<div class='login-wrapper'>
+  <div class='login-brand-icon'><i class='bi bi-moon-stars-fill'></i></div>
+  <div class='card login-card'>
+    <div class='card-body p-4 text-center'>
+      <h5 class='fw-bold mb-2'>Momentan offline</h5>
+      <p class='text-muted'>Diese Anwendung ist vorübergehend nicht verfügbar.<br>Bitte versuchen Sie es später erneut.</p>
+    </div>
+  </div>
+</div>
+<link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css'/>
+</body></html>");
+                return;
+            }
+        }
+    }
+    await next();
+});
+
 app.UseAuthorization();
 app.MapRazorPages();
 

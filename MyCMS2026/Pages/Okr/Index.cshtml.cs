@@ -30,45 +30,53 @@ public class OkrIndexModel : PageModel
         Objectives = showAll ? all : all.Where(o => o.Status == "aktiv").ToList();
     }
 
-    public async Task<IActionResult> OnPostAddObjectiveAsync(string text, int year)
+    // Hilfsmethode: zurück zum Widget oder zur OKR-Seite
+    private IActionResult RedirectBack(string? returnPageId, int? year)
+    {
+        if (!string.IsNullOrEmpty(returnPageId))
+            return Redirect($"/Page/Index?Id={returnPageId}&okrYear={year}");
+        return RedirectToPage(new { year });
+    }
+
+    public async Task<IActionResult> OnPostAddObjectiveAsync(string text, int year, string? returnPageId)
     {
         if (!User.IsInRole("Administrator")) return Forbid();
         await _okr.CreateObjectiveAsync(new OkrObjective { Text = text, Year = year, Status = "aktiv" });
-        return RedirectToPage(new { year });
+        return RedirectBack(returnPageId, year);
     }
 
-    public async Task<IActionResult> OnPostEditObjectiveAsync(string objectiveId, string text, string status, int year)
+    public async Task<IActionResult> OnPostEditObjectiveAsync(string objectiveId, string text, string status, int year, string? returnPageId, int? okrYear)
     {
         if (!User.IsInRole("Administrator")) return Forbid();
         await _okr.UpdateObjectiveAsync(objectiveId, text, status, year);
-        return RedirectToPage(new { year });
+        return RedirectBack(returnPageId, okrYear ?? year);
     }
 
-    public async Task<IActionResult> OnPostDeleteObjectiveAsync(string objectiveId)
+    public async Task<IActionResult> OnPostDeleteObjectiveAsync(string objectiveId, string? returnPageId, int? okrYear)
     {
         if (!User.IsInRole("Administrator")) return Forbid();
         await _okr.DeleteObjectiveAsync(objectiveId);
-        return RedirectToPage();
+        return RedirectBack(returnPageId, okrYear);
     }
 
-    public async Task<IActionResult> OnPostAddKrAsync(string objectiveId, string krText, double target, int? year)
+    public async Task<IActionResult> OnPostAddKrAsync(string objectiveId, string krText, double target, int? year, string? returnPageId, int? okrYear)
     {
         if (!User.IsInRole("Administrator")) return Forbid();
         await _okr.AddKeyResultAsync(objectiveId, new OkrKeyResult { Text = krText, TargetValue = target });
-        return RedirectToPage(new { year });
+        return RedirectBack(returnPageId, okrYear ?? year);
     }
 
-    public async Task<IActionResult> OnPostUpdateProgressAsync(string objectiveId, string krId, double current, int? year)
+    public async Task<IActionResult> OnPostUpdateProgressAsync(string objectiveId, string krId, double current, int? year, string? returnPageId, int? okrYear)
     {
         if (!User.IsInRole("Administrator")) return Forbid();
         await _okr.UpdateProgressAsync(objectiveId, krId, current);
-        return RedirectToPage(new { year });
+        return RedirectBack(returnPageId, okrYear ?? year);
     }
 
-    public async Task<IActionResult> OnPostDeleteKrAsync(string objectiveId, string krId, int? year)
+    public async Task<IActionResult> OnPostDeleteKrAsync(string objectiveId, string krId, int? year, string? returnPageId, int? okrYear)
     {
         if (!User.IsInRole("Administrator")) return Forbid();
         await _okr.DeleteKeyResultAsync(objectiveId, krId);
-        return RedirectToPage(new { year });
+        return RedirectBack(returnPageId, okrYear ?? year);
     }
 }

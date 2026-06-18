@@ -24,29 +24,16 @@
             <label class="form-label fw-semibold">Status</label>
             <select asp-for="Config.Status" class="form-select">
                 <option value="Active">Active</option>
-                <option value="Maintenance">Maintenance</option>
-                <option value="Offline">Offline</option>
+                <option value="Offline">Offline (nur Administratoren können sich anmelden)</option>
             </select>
         </div>
         <div class="mb-3">
-            <label class="form-label fw-semibold">Footer-Text</label>
-            <input asp-for="Config.FooterText" class="form-control" />
-        </div>
-        <div class="mb-3">
             <label class="form-label fw-semibold">Logo-URL</label>
-            <input asp-for="Config.LogoUrl" class="form-control" placeholder="/images/logo.png" />
+            <input asp-for="Config.LogoUrl" class="form-control" placeholder="~/images/logo.png" />
         </div>
         <div class="mb-3">
-            <label class="form-label fw-semibold">HTTP-Host</label>
-            <input asp-for="Config.HTTPHost" class="form-control" />
-        </div>
-        <div class="mb-3 form-check">
-            <input asp-for="Config.ForceHTTPS" type="checkbox" class="form-check-input" />
-            <label asp-for="Config.ForceHTTPS" class="form-check-label">HTTPS erzwingen</label>
-        </div>
-        <div class="mb-3">
-            <label class="form-label fw-semibold">Maximale Menü-Ebenen</label>
-            <input asp-for="Config.MaximumMenuLevels" type="number" class="form-control" />
+            <label class="form-label fw-semibold">Footer-Text</label>
+            <input asp-for="Config.FooterText" class="form-control" placeholder="Wird im Home-Widget unten angezeigt" />
         </div>
         <hr />
         <h6>Weekly Mail</h6>

@@ -489,4 +489,72 @@ tr.pend-row-done:hover { background: #e2f5e9 !important; }
     border-bottom: 1px solid #f0f0f0;
 }
 .file-item:last-child { border-bottom: none; }
+
+/* ═══════════════════════════════════════════════════════════
+   MEETING TIMELINE WIDGET
+   ═══════════════════════════════════════════════════════════ */
+
+.timeline {
+    position: relative;
+    padding-left: 0;
+}
+
+.timeline-item {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    position: relative;
+}
+
+.timeline-marker {
+    flex-shrink: 0;
+    width: 42px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.timeline-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background-color: var(--cms-accent);
+    border: 3px solid white;
+    box-shadow: 0 0 0 2px var(--cms-accent);
+    margin-top: 0.35rem;
+    flex-shrink: 0;
+}
+
+.timeline-line {
+    width: 2px;
+    flex: 1;
+    background-color: #dee2e6;
+    margin-top: 4px;
+}
+
+.timeline-content {
+    flex: 1;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.timeline-date {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 0.25rem;
+}
+
+.timeline-title {
+    color: var(--cms-blue);
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    font-size: 1rem;
+}
+
+@media (max-width: 576px) {
+    .timeline-marker { display: none; }
+}
 .file-item .bi { color: var(--cms-blue); }

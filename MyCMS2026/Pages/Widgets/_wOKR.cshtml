@@ -11,73 +11,273 @@
     var currentYear = DateTime.Now.Year;
     if (int.TryParse(Context.Request.Query["okrYear"].ToString(), out int qYear) && qYear > 0)
         currentYear = qYear;
-
-    // Sicherstellen, dass das gewählte Jahr in der Liste ist (z.B. bei aktuellem Jahr ohne Daten)
     if (!allYears.Contains(currentYear)) allYears.Add(currentYear);
     allYears = allYears.OrderByDescending(y => y).ToList();
 
-    var objectives = (await OkrSvc.GetByYearAsync(currentYear))
-        .Where(o => o.Status == "aktiv")
-        .ToList();
+    var showAll  = Context.Request.Query["showAll"].ToString() == "true";
+    var all      = await OkrSvc.GetByYearAsync(currentYear);
+    var objectives = showAll ? all : all.Where(o => o.Status == "aktiv").ToList();
 }
 
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+@* Jahr-Navigation + Filter *@
+<div class="mb-3 d-flex align-items-center gap-2 flex-wrap">
     <div class="d-flex align-items-center gap-1">
         @foreach (var y in allYears)
         {
             var active = y == currentYear;
-            <a href="?Id=@pageId&okrYear=@y"
-               class="btn btn-sm @(active ? "btn-cms" : "btn-outline-secondary")">
-                @y
-            </a>
+            <a href="?Id=@pageId&okrYear=@y&showAll=@showAll"
+               class="btn btn-sm @(active ? "btn-cms" : "btn-outline-secondary")">@y</a>
         }
     </div>
-    <div class="d-flex align-items-center gap-2">
-        <span class="text-muted small">@objectives.Count aktive Objective(s)</span>
-        <a asp-page="/Okr/Index" asp-route-year="@currentYear" class="btn btn-outline-secondary btn-sm">Verwalten</a>
+    <div class="form-check ms-2 mb-0">
+        <input class="form-check-input" type="checkbox" id="wOkrShowAll"
+               @(showAll ? "checked" : "")
+               onchange="location.href='?Id=@pageId&okrYear=@currentYear&showAll='+(this.checked?'true':'false')" />
+        <label class="form-check-label small" for="wOkrShowAll">Abgeschlossene anzeigen</label>
     </div>
+    @if (isAdmin)
+    {
+        <button class="btn btn-cms btn-sm ms-auto" data-bs-toggle="modal" data-bs-target="#wOkrModalNew">
+            <i class="bi bi-plus-circle me-1"></i>Neues Objective
+        </button>
+    }
 </div>
-
-@foreach (var obj in objectives)
-{
-    var objProgress = obj.KeyResults.Count > 0
-        ? obj.KeyResults.Average(kr => kr.ProgressPercent)
-        : 0.0;
-    string progressColor;
-    if (objProgress >= 80)      progressColor = "success";
-    else if (objProgress >= 50) progressColor = "warning";
-    else                        progressColor = "danger";
-
-    <div class="mb-4">
-        <div class="d-flex justify-content-between align-items-start mb-1">
-            <div class="fw-semibold small">@obj.Text</div>
-            <strong class="small ms-2">@objProgress.ToString("0.#")%</strong>
-        </div>
-        <div class="progress okr-progress-bar mb-2">
-            <div class="progress-bar bg-@progressColor" style="width:@objProgress%"></div>
-        </div>
-
-        @foreach (var kr in obj.KeyResults)
-        {
-            string krColor;
-            if (kr.ProgressPercent >= 80)      krColor = "success";
-            else if (kr.ProgressPercent >= 50) krColor = "warning";
-            else                               krColor = "danger";
-            <div class="d-flex align-items-center gap-2 mb-1 ms-2">
-                <span class="small text-muted text-truncate flex-grow-1" title="@kr.Text">@kr.Text</span>
-                <div class="progress" style="width:80px;height:8px;flex-shrink:0">
-                    <div class="progress-bar bg-@krColor" style="width:@kr.ProgressPercent%"></div>
-                </div>
-                <span class="small text-muted" style="min-width:36px;text-align:right">@kr.ProgressPercent.ToString("0.#")%</span>
-            </div>
-        }
-    </div>
-}
 
 @if (!objectives.Any())
 {
-    <div class="text-center text-muted py-3">
-        <i class="bi bi-bullseye d-block mb-1 fs-4"></i>
-        Keine aktiven OKRs für @currentYear.
+    <div class="alert alert-info">Keine OKRs für die gewählte Auswahl vorhanden.</div>
+}
+
+@foreach (var obj in objectives)
+{
+    var totalProgress = obj.KeyResults.Any()
+        ? obj.KeyResults.Average(kr => kr.ProgressPercent)
+        : 0.0;
+    string progressColor;
+    if      (totalProgress >= 80) progressColor = "success";
+    else if (totalProgress >= 50) progressColor = "warning";
+    else                          progressColor = "danger";
+
+    <div class="card okr-card">
+        <div class="card-header card-header-cms d-flex justify-content-between align-items-start">
+            <div>
+                <div class="fw-semibold text-white">@obj.Text</div>
+                <div class="mt-1">
+                    <span class="badge bg-light text-dark me-1">@obj.Year</span>
+                    <span class="badge @(obj.Status == "aktiv" ? "bg-success" : "bg-secondary")">@obj.Status</span>
+                </div>
+            </div>
+            @if (isAdmin)
+            {
+                <div class="d-flex gap-1 ms-2">
+                    <button class="btn btn-sm btn-outline-light"
+                            data-obj-id="@obj.Id" data-obj-text="@obj.Text"
+                            data-obj-status="@obj.Status" data-obj-year="@obj.Year"
+                            onclick="wOkrEditObjective(this)">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <form id="wOkrDelObj-@obj.Id" method="post" asp-page="/Okr/Index" asp-page-handler="DeleteObjective" style="display:none">
+                        <input type="hidden" name="objectiveId" value="@obj.Id" />
+                        <input type="hidden" name="returnPageId" value="@pageId" />
+                        <input type="hidden" name="okrYear" value="@currentYear" />
+                    </form>
+                    <button class="btn btn-sm btn-outline-light"
+                            onclick="cmsConfirmDelete('wOkrDelObj-@obj.Id', 'Objective «@obj.Text.Replace("'", "\\'")» löschen?'); return false;">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            }
+        </div>
+        <div class="card-body">
+            <div class="mb-3">
+                <div class="d-flex justify-content-between small mb-1">
+                    <span class="text-muted">Gesamtfortschritt</span>
+                    <strong>@totalProgress.ToString("0.#")%</strong>
+                </div>
+                <div class="progress okr-progress-bar">
+                    <div class="progress-bar bg-@progressColor" style="width:@totalProgress%"></div>
+                </div>
+            </div>
+
+            @if (obj.KeyResults.Any())
+            {
+                <table class="table table-sm align-middle mb-2">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Key Result</th>
+                            <th class="text-center" style="width:100px">Ziel</th>
+                            <th class="text-center" style="width:120px">Aktuell</th>
+                            <th style="width:150px">Fortschritt</th>
+                            @if (isAdmin) { <th class="text-end" style="width:60px"></th> }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var kr in obj.KeyResults)
+                        {
+                            string krColor;
+                            if      (kr.ProgressPercent >= 80) krColor = "success";
+                            else if (kr.ProgressPercent >= 50) krColor = "warning";
+                            else                               krColor = "danger";
+                            <tr>
+                                <td>@kr.Text</td>
+                                <td class="text-center">@kr.TargetValue.ToString("N0")</td>
+                                <td class="text-center">
+                                    @if (isAdmin)
+                                    {
+                                        <form method="post" asp-page="/Okr/Index" asp-page-handler="UpdateProgress"
+                                              class="d-flex gap-1 justify-content-center">
+                                            <input type="hidden" name="objectiveId" value="@obj.Id" />
+                                            <input type="hidden" name="krId"        value="@kr.Id" />
+                                            <input type="hidden" name="returnPageId" value="@pageId" />
+                                            <input type="hidden" name="okrYear"     value="@currentYear" />
+                                            <input type="number" name="current" value="@kr.CurrentValue" step="0.1"
+                                                   class="form-control form-control-sm text-center" style="width:75px;" />
+                                            <button class="btn btn-sm btn-outline-secondary" title="Aktualisieren">↻</button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        @kr.CurrentValue.ToString("N0")
+                                    }
+                                </td>
+                                <td>
+                                    <div class="progress" style="height:14px;">
+                                        <div class="progress-bar bg-@krColor" style="width:@kr.ProgressPercent%"></div>
+                                    </div>
+                                    <div class="text-end small text-muted">@kr.ProgressPercent.ToString("0.#")%</div>
+                                </td>
+                                @if (isAdmin)
+                                {
+                                    <td class="text-end">
+                                        <form id="wOkrDelKr-@kr.Id" method="post" asp-page="/Okr/Index" asp-page-handler="DeleteKr" style="display:none">
+                                            <input type="hidden" name="objectiveId"  value="@obj.Id" />
+                                            <input type="hidden" name="krId"         value="@kr.Id" />
+                                            <input type="hidden" name="returnPageId" value="@pageId" />
+                                            <input type="hidden" name="okrYear"      value="@currentYear" />
+                                        </form>
+                                        <button class="btn btn-sm btn-outline-danger"
+                                                onclick="cmsConfirmDelete('wOkrDelKr-@kr.Id', 'Key Result «@kr.Text.Replace("'", "\\'")» löschen?'); return false;">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <p class="text-muted small">Noch keine Key Results angelegt.</p>
+            }
+
+            @if (isAdmin)
+            {
+                <form method="post" asp-page="/Okr/Index" asp-page-handler="AddKr"
+                      class="row g-2 align-items-end mt-1">
+                    <input type="hidden" name="objectiveId"  value="@obj.Id" />
+                    <input type="hidden" name="returnPageId" value="@pageId" />
+                    <input type="hidden" name="okrYear"      value="@currentYear" />
+                    <div class="col-sm-5">
+                        <input type="text" name="krText" class="form-control form-control-sm"
+                               placeholder="Neues Key Result..." required />
+                    </div>
+                    <div class="col-sm-3">
+                        <input type="number" name="target" step="0.1" class="form-control form-control-sm"
+                               placeholder="Zielwert" required />
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-sm btn-cms"><i class="bi bi-plus me-1"></i>Key Result</button>
+                    </div>
+                </form>
+            }
+        </div>
     </div>
 }
+
+@if (isAdmin)
+{
+    @* Modal: Neues Objective *@
+    <div class="modal fade" id="wOkrModalNew" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header card-header-cms rounded-0">
+                    <h5 class="modal-title text-white">Neues Objective</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="post" asp-page="/Okr/Index" asp-page-handler="AddObjective">
+                    <input type="hidden" name="returnPageId" value="@pageId" />
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Objective Text *</label>
+                            <textarea name="text" class="form-control" rows="3" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Jahr</label>
+                            <select name="year" class="form-select">
+                                @for (var y = DateTime.Now.Year + 1; y >= DateTime.Now.Year - 3; y--)
+                                {
+                                    <option value="@y" selected="@(y == currentYear)">@y</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                        <button type="submit" class="btn btn-cms">Anlegen</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    @* Modal: Objective bearbeiten *@
+    <div class="modal fade" id="wOkrModalEdit" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header card-header-cms rounded-0">
+                    <h5 class="modal-title text-white">Objective bearbeiten</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="post" asp-page="/Okr/Index" asp-page-handler="EditObjective">
+                    <input type="hidden" name="returnPageId" value="@pageId" />
+                    <input type="hidden" name="okrYear"      value="@currentYear" />
+                    <div class="modal-body">
+                        <input type="hidden" name="objectiveId" id="wOkrEditId" />
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Text *</label>
+                            <textarea name="text" id="wOkrEditText" class="form-control" rows="3" required></textarea>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label fw-semibold">Status</label>
+                                <select name="status" id="wOkrEditStatus" class="form-select">
+                                    <option value="aktiv">aktiv</option>
+                                    <option value="abgeschlossen">abgeschlossen</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-semibold">Jahr</label>
+                                <input type="number" name="year" id="wOkrEditYear" class="form-control" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                        <button type="submit" class="btn btn-cms">Speichern</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+<script>
+function wOkrEditObjective(btn) {
+    document.getElementById('wOkrEditId').value     = btn.dataset.objId;
+    document.getElementById('wOkrEditText').value   = btn.dataset.objText;
+    document.getElementById('wOkrEditStatus').value = btn.dataset.objStatus;
+    document.getElementById('wOkrEditYear').value   = btn.dataset.objYear;
+    new bootstrap.Modal(document.getElementById('wOkrModalEdit')).show();
+}
+</script>

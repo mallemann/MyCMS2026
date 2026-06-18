@@ -10,7 +10,9 @@
         "wToDo"      => "bi-check2-square",
         "wMeetings"  => "bi-calendar-event",
         "wDownloads" => "bi-download",
-        "wOKR"       => "bi-bullseye",
+        "wOKR"            => "bi-bullseye",
+        "wMeetingTimeline" => "bi-calendar3",
+        "wDashboard"       => "bi-graph-up",
         "wVault"     => "bi-safe",
         "wProjects"  => "bi-kanban",
         _            => "bi-circle"
@@ -178,7 +180,7 @@
                     <a class="cms-nav-item @(currentPath.StartsWith("/admin/weeklymail") ? "active" : "")"
                        asp-page="/Admin/WeeklyMail">
                         <i class="bi bi-envelope-paper cms-nav-icon"></i>
-                        Weekly Mail
+                        Reporting Settings
                     </a>
                 }
 

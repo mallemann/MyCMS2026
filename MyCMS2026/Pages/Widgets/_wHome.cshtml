@@ -51,10 +51,6 @@
                     <span class="text-muted">@string.Join(", ", Model.UserRoles)</span>
                 </li>
                 <li class="list-group-item d-flex justify-content-between">
-                    <span>Status</span>
-                    <span class="badge bg-success">@site.Status</span>
-                </li>
-                <li class="list-group-item d-flex justify-content-between">
                     <span>Version</span>
                     <span class="text-muted">MyCMS 2026</span>
                 </li>
@@ -62,3 +58,8 @@
         </div>
     </div>
 </div>
+
+@if (!string.IsNullOrWhiteSpace(site.FooterText))
+{
+    <div class="text-muted small mt-4 pt-3 border-top">@site.FooterText</div>
+}

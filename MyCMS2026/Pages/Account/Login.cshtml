@@ -18,7 +18,15 @@
 <body class="login-body">
 <div class="login-wrapper">
     <div class="login-brand-icon">
-        <i class="bi bi-grid-3x3-gap-fill"></i>
+        @if (!string.IsNullOrEmpty(Model.SiteLogoUrl))
+        {
+            <img src="@Url.Content(Model.SiteLogoUrl)" alt="@Model.SiteTitle"
+                 style="max-height:72px;max-width:180px;object-fit:contain;" />
+        }
+        else
+        {
+            <i class="bi bi-grid-3x3-gap-fill"></i>
+        }
     </div>
     <div class="card login-card">
         <div class="card-body p-4">

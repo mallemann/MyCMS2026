@@ -22,22 +22,32 @@ public class LoginModel : PageModel
 
     public string ErrorMessage { get; set; } = "";
     public string SiteTitle { get; set; } = "MyCMS";
+    public string SiteLogoUrl { get; set; } = "";
 
     public async Task OnGetAsync()
     {
         var cfg = await _site.GetAsync();
-        SiteTitle = cfg.Title;
+        SiteTitle   = cfg.Title;
+        SiteLogoUrl = cfg.LogoUrl;
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
         var cfg = await _site.GetAsync();
-        SiteTitle = cfg.Title;
+        SiteTitle   = cfg.Title;
+        SiteLogoUrl = cfg.LogoUrl;
 
         var user = await _users.ValidateAsync(UserName, Password);
         if (user == null)
         {
             ErrorMessage = "Benutzername oder Passwort ungültig.";
+            return Page();
+        }
+
+        // Offline-Sperre: Nur Administratoren dürfen sich anmelden
+        if (cfg.Status == "Offline" && !user.Roles.Contains("Administrator"))
+        {
+            ErrorMessage = "Die Anwendung ist momentan offline. Bitte versuchen Sie es später erneut.";
             return Page();
         }
 
