@@ -4,15 +4,18 @@
 @inject MeetingService MeetingSvc
 @inject MyCMS2026.Services.KlassenService KlassenSvc
 @{
-    var isAdmin = User.IsInRole("Administrator");
-    var gruppe  = Model.NavItem?.ConfigString ?? "";
-    var pageId  = Model.Id;
+    var isAdmin        = User.IsInRole("Administrator");
+    var gruppe         = Model.NavItem?.ConfigString ?? "";
+    var pageId         = Model.Id;
+    var currentUser    = User.Identity?.Name ?? "";
+    var currentKuerzel = User.FindFirst("Kuerzel")?.Value ?? "";
     var meetingKlassen = await KlassenSvc.GetKlassenAsync("meetings");
 
     // Filter aus Query-String
     var search = Context.Request.Query["search"].ToString();
     var status = Context.Request.Query["status"].ToString();
     var klasse = Context.Request.Query["klasse"].ToString();
+    var meine  = Context.Request.Query["meine"].ToString() == "1";
 
     var all = await MeetingSvc.GetAllAsync();
     if (!string.IsNullOrWhiteSpace(gruppe))
@@ -25,6 +28,9 @@
         all = all.Where(m => m.Status == status).ToList();
     if (!string.IsNullOrWhiteSpace(klasse))
         all = all.Where(m => m.Klasse == klasse).ToList();
+    if (meine)
+        all = all.Where(m => (!string.IsNullOrEmpty(currentUser)    && m.Leitung.Equals(currentUser,    StringComparison.OrdinalIgnoreCase))
+                           || (!string.IsNullOrEmpty(currentKuerzel) && m.Leitung.Equals(currentKuerzel, StringComparison.OrdinalIgnoreCase))).ToList();
 }
 
 @* Delete-Forms ausserhalb der Tabelle *@
@@ -84,9 +90,14 @@
                 }
             </select>
         </div>
-        <div class="col-auto">
+        <div class="col-auto d-flex align-items-center gap-2">
+            <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" name="meine" value="1" id="wMtgMeine"
+                       @(meine ? "checked" : "") onchange="this.form.submit()" />
+                <label class="form-check-label small text-nowrap" for="wMtgMeine">Meine</label>
+            </div>
             <button type="submit" class="btn btn-cms btn-sm"><i class="bi bi-funnel me-1"></i>Filter</button>
-            <a href="/Page/Index?Id=@pageId" class="btn btn-outline-secondary btn-sm ms-1">Reset</a>
+            <a href="/Page/Index?Id=@pageId" class="btn btn-outline-secondary btn-sm">Reset</a>
         </div>
     </form>
 </div>

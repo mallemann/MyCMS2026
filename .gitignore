@@ -361,3 +361,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# MyCMS App_Data — Laufzeitdaten und Credentials, nicht ins Repo
+MyCMS2026/App_Data/*.json
+MyCMS2026/App_Data/uploads/

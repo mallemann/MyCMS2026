@@ -29,6 +29,8 @@ public class MeetingEditModel : PageModel
     public string? Error { get; set; }
     public List<string> Kuerzel { get; set; } = new();
     public List<Project> Projects { get; set; } = new();
+    /// <summary>Set when creating from a project — Gruppe is locked to the project's Gruppe.</summary>
+    public string? ProjectGruppe { get; set; }
 
     private async Task LoadKuerzelAsync()
     {
@@ -87,6 +89,16 @@ public class MeetingEditModel : PageModel
                 || await HasNavExtendedAccessAsync(returnPageId);
             if (!canEdit) return Forbid();
             Meeting = existing;
+            // Lock Gruppe if this Meeting belongs to a project
+            if (!string.IsNullOrEmpty(existing.ProjectId))
+            {
+                var proj = await _projects.GetByIdAsync(existing.ProjectId);
+                if (proj != null && !string.IsNullOrEmpty(proj.Gruppe))
+                {
+                    ProjectGruppe  = proj.Gruppe;
+                    Meeting.Gruppe = proj.Gruppe;  // keep in sync with project
+                }
+            }
         }
         else
         {
@@ -94,9 +106,20 @@ public class MeetingEditModel : PageModel
                 || await IsProjectEditorAsync(projectId)
                 || await HasNavExtendedAccessAsync(returnPageId);
             if (!canCreate) return Forbid();
-            Meeting.Gruppe = gruppe ?? "";
             if (!string.IsNullOrEmpty(projectId))
+            {
                 Meeting.ProjectId = projectId;
+                var proj = await _projects.GetByIdAsync(projectId);
+                if (proj != null && !string.IsNullOrEmpty(proj.Gruppe))
+                {
+                    Meeting.Gruppe = proj.Gruppe;
+                    ProjectGruppe  = proj.Gruppe;
+                }
+            }
+            else
+            {
+                Meeting.Gruppe = gruppe ?? "";
+            }
         }
         ReturnProjectId = projectId ?? Meeting.ProjectId;
         ReturnPageId    = returnPageId;

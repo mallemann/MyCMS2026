@@ -80,10 +80,7 @@ public class UsersModel : PageModel
             return Page();
         }
 
-        var (ok, error) = await _users.UpdateUserAsync(
-            setUserName, setUserName, "", setNewPassword, new List<string>(), true);
-
-        // UpdateUserAsync würde Rollen/Email leeren — direkter Weg über existierenden User
+        // Erst User laden, dann nur Passwort setzen — Rollen/E-Mail bleiben unverändert
         var user = (await _users.GetAllAsync()).FirstOrDefault(u =>
             u.UserName.Equals(setUserName, StringComparison.OrdinalIgnoreCase));
 
@@ -95,14 +92,11 @@ public class UsersModel : PageModel
             return Page();
         }
 
-        // Passwort direkt setzen ohne andere Felder zu ändern
-        var (setOk, setError) = await _users.UpdateUserAsync(
-            user.UserName, user.UserName, user.Email, setNewPassword,
-            user.Roles, user.IsActive, user.Kuerzel);
+        var setOk = await _users.SetPasswordAsync(setUserName, setNewPassword);
 
         if (!setOk)
         {
-            Message = setError;
+            Message = $"Passwort für '{setUserName}' konnte nicht gesetzt werden.";
             IsError = true;
         }
         else

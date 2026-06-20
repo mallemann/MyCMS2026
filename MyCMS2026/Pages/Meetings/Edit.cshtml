@@ -102,10 +102,20 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label fw-semibold">Gruppe</label>
-                    <input asp-for="Meeting.Gruppe" class="form-control" list="gruppenList" placeholder="– keine –" autocomplete="off" />
-                    <datalist id="gruppenList">
-                        @foreach (var g in alleGruppen) { <option value="@g" /> }
-                    </datalist>
+                    @if (!string.IsNullOrEmpty(Model.ProjectGruppe))
+                    {
+                        @* Locked to project's Gruppe *@
+                        <input type="hidden" asp-for="Meeting.Gruppe" />
+                        <input class="form-control" value="@Model.ProjectGruppe" readonly />
+                        <div class="form-text text-muted"><i class="bi bi-lock me-1"></i>Vom Projekt vorgegeben</div>
+                    }
+                    else
+                    {
+                        <input asp-for="Meeting.Gruppe" class="form-control" list="gruppenList" placeholder="– keine –" autocomplete="off" />
+                        <datalist id="gruppenList">
+                            @foreach (var g in alleGruppen) { <option value="@g" /> }
+                        </datalist>
+                    }
                 </div>
                 <div class="col-md-6">
                     <label class="form-label fw-semibold">Inhaltstyp</label>
@@ -150,7 +160,12 @@
                 </div>
             }
 
-            @if (Model.Projects.Any())
+            @if (!string.IsNullOrEmpty(Model.ReturnProjectId))
+            {
+                @* Aus Projekt heraus angelegt — Projektzuordnung ist fix *@
+                <input type="hidden" asp-for="Meeting.ProjectId" />
+            }
+            else if (Model.Projects.Any())
             {
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Projekt</label>

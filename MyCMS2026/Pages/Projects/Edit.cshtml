@@ -86,20 +86,53 @@
                 </div>
             </div>
 
-            <hr />
-            <h6 class="fw-semibold mb-3"><i class="bi bi-shield-lock me-1 text-muted"></i>Zugriffsberechtigungen</h6>
-            <div class="row g-3 mb-4">
-                <div class="col-md-6">
-                    <label class="form-label fw-semibold">Lesen (Rolle)</label>
-                    <input asp-for="Input.LeseRolle" class="form-control" />
-                    <div class="form-text">Welche Rolle darf dieses Projekt sehen? Leer = alle.</div>
+            @if (Model.IsAdmin)
+            {
+                <hr />
+                <h6 class="fw-semibold mb-3"><i class="bi bi-shield-lock me-1 text-muted"></i>Zugriffsberechtigungen</h6>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Gruppe <span class="text-danger">*</span></label>
+                        <select asp-for="Input.Gruppe" class="form-select">
+                            <option value="">– keine –</option>
+                            @foreach (var g in Model.AvailableGruppen)
+                            {
+                                <option value="@g" selected="@(Model.Input.Gruppe == g)">@g</option>
+                            }
+                        </select>
+                        <div class="form-text">Gruppe, zu der dieses Projekt gehört.</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Lesen (Rolle)</label>
+                        <select asp-for="Input.LeseRolle" class="form-select">
+                            <option value="">– alle –</option>
+                            @foreach (var r in Model.RoleNames)
+                            {
+                                <option value="@r" selected="@(Model.Input.LeseRolle == r)">@r</option>
+                            }
+                        </select>
+                        <div class="form-text">Wer darf dieses Projekt sehen?</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Bearbeiten (Rolle)</label>
+                        <select asp-for="Input.BearbeitenRolle" class="form-select">
+                            <option value="">– niemand (nur Admin) –</option>
+                            @foreach (var r in Model.RoleNames)
+                            {
+                                <option value="@r" selected="@(Model.Input.BearbeitenRolle == r)">@r</option>
+                            }
+                        </select>
+                        <div class="form-text">Wer darf Journal/Metadaten bearbeiten?</div>
+                    </div>
                 </div>
-                <div class="col-md-6">
-                    <label class="form-label fw-semibold">Bearbeiten (Rolle)</label>
-                    <input asp-for="Input.BearbeitenRolle" class="form-control" />
-                    <div class="form-text">Welche Rolle darf Journal/etc. bearbeiten? Leer = niemand (nur Admin).</div>
-                </div>
-            </div>
+            }
+            else
+            {
+                @* Nicht-Admin: Gruppe + Rollen als Hidden-Felder durchleiten *@
+                <input type="hidden" asp-for="Input.Gruppe" />
+                <input type="hidden" asp-for="Input.LeseRolle" />
+                <input type="hidden" asp-for="Input.BearbeitenRolle" />
+            }
 
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-cms">

@@ -113,21 +113,18 @@
                     <div class="col-4">
                         <label class="form-label">Sichtbar für</label>
                         <select name="visRole" class="form-select">
-                            <option value="">(alle)</option>
                             @foreach (var r in Model.AvailableRoles) { <option value="@r" selected="@(r=="Member")">@r</option> }
                         </select>
                     </div>
                     <div class="col-4">
                         <label class="form-label">Lesen</label>
                         <select name="basicRole" class="form-select">
-                            <option value="">(alle)</option>
                             @foreach (var r in Model.AvailableRoles) { <option value="@r" selected="@(r=="Member")">@r</option> }
                         </select>
                     </div>
                     <div class="col-4">
                         <label class="form-label">Bearbeiten</label>
                         <select name="extRole" class="form-select">
-                            <option value="">(alle)</option>
                             @foreach (var r in Model.AvailableRoles) { <option value="@r" selected="@(r=="Administrator")">@r</option> }
                         </select>
                     </div>
@@ -181,21 +178,18 @@
                     <div class="col-4">
                         <label class="form-label">Sichtbar für</label>
                         <select id="eVisRole" name="visRole" class="form-select">
-                            <option value="">(alle)</option>
                             @foreach (var r in Model.AvailableRoles) { <option value="@r">@r</option> }
                         </select>
                     </div>
                     <div class="col-4">
                         <label class="form-label">Lesen</label>
                         <select id="eBasicRole" name="basicRole" class="form-select">
-                            <option value="">(alle)</option>
                             @foreach (var r in Model.AvailableRoles) { <option value="@r">@r</option> }
                         </select>
                     </div>
                     <div class="col-4">
                         <label class="form-label">Bearbeiten</label>
                         <select id="eExtRole" name="extRole" class="form-select">
-                            <option value="">(alle)</option>
                             @foreach (var r in Model.AvailableRoles) { <option value="@r">@r</option> }
                         </select>
                     </div>

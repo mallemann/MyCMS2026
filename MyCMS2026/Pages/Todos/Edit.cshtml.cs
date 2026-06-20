@@ -29,6 +29,8 @@ public class TodoEditModel : PageModel
     public string? Error { get; set; }
     public List<string> Kuerzel { get; set; } = new();
     public List<Project> Projects { get; set; } = new();
+    /// <summary>Set when creating from a project — Gruppe is locked to the project's Gruppe.</summary>
+    public string? ProjectGruppe { get; set; }
 
     private async Task LoadKuerzelAsync()
     {
@@ -88,6 +90,16 @@ public class TodoEditModel : PageModel
                 || await HasNavExtendedAccessAsync(returnPageId);
             if (!canEdit) return Forbid();
             Todo = existing;
+            // Lock Gruppe if this Todo belongs to a project
+            if (!string.IsNullOrEmpty(existing.ProjectId))
+            {
+                var proj = await _projects.GetByIdAsync(existing.ProjectId);
+                if (proj != null && !string.IsNullOrEmpty(proj.Gruppe))
+                {
+                    ProjectGruppe = proj.Gruppe;
+                    Todo.Gruppe   = proj.Gruppe;  // keep in sync with project
+                }
+            }
         }
         else
         {
@@ -98,9 +110,20 @@ public class TodoEditModel : PageModel
             if (!canCreate) return Forbid();
             Todo.Anlagedatum  = DateTime.Today;
             Todo.ErledigenBis = DateTime.Today.AddDays(30);
-            Todo.Gruppe       = gruppe ?? "";
             if (!string.IsNullOrEmpty(projectId))
+            {
                 Todo.ProjectId = projectId;
+                var proj = await _projects.GetByIdAsync(projectId);
+                if (proj != null && !string.IsNullOrEmpty(proj.Gruppe))
+                {
+                    Todo.Gruppe   = proj.Gruppe;
+                    ProjectGruppe = proj.Gruppe;
+                }
+            }
+            else
+            {
+                Todo.Gruppe = gruppe ?? "";
+            }
         }
         ReturnProjectId = projectId ?? Todo.ProjectId;
         ReturnPageId    = returnPageId;

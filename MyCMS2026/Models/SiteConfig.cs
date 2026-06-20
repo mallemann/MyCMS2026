@@ -7,4 +7,16 @@ public class SiteConfig
     public string FooterText { get; set; } = "";
     public string LogoUrl { get; set; } = "";
     public bool WeeklyMailEnabled { get; set; } = false;
+    public SmtpSettings Smtp { get; set; } = new();
+}
+
+public class SmtpSettings
+{
+    public string Host { get; set; } = "";
+    public int Port { get; set; } = 587;
+    /// <summary>StartTls | SslOnConnect | None</summary>
+    public string SslMode { get; set; } = "StartTls";
+    public string User { get; set; } = "";
+    public string Password { get; set; } = "";
+    public string From { get; set; } = "";
 }

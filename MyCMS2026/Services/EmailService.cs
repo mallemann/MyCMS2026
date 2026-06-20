@@ -1,36 +1,38 @@
 using MailKit.Net.Smtp;
 using MimeKit;
+using MyCMS2026.Models;
 
 namespace MyCMS2026.Services;
 
 public class EmailService
 {
-    private readonly IConfiguration _cfg;
+    private readonly SiteService _site;
     private readonly ILogger<EmailService> _log;
 
-    public EmailService(IConfiguration cfg, ILogger<EmailService> log)
+    public EmailService(SiteService site, ILogger<EmailService> log)
     {
-        _cfg = cfg;
-        _log = log;
+        _site = site;
+        _log  = log;
     }
 
     public async Task SendAsync(string to, string subject, string htmlBody)
     {
-        var host = _cfg["Smtp:Host"];
-        if (string.IsNullOrEmpty(host))
+        var cfg  = await _site.GetAsync();
+        var smtp = cfg.Smtp;
+
+        if (string.IsNullOrEmpty(smtp.Host))
         {
             _log.LogWarning("SMTP nicht konfiguriert – E-Mail nicht gesendet: {Subject}", subject);
             return;
         }
 
         var msg = new MimeMessage();
-        msg.From.Add(MailboxAddress.Parse(_cfg["Smtp:From"]));
+        msg.From.Add(MailboxAddress.Parse(smtp.From));
         msg.To.Add(MailboxAddress.Parse(to));
         msg.Subject = subject;
         msg.Body = new TextPart("html") { Text = htmlBody };
 
-        var port    = int.Parse(_cfg["Smtp:Port"] ?? "587");
-        var sslMode = (_cfg["Smtp:SslMode"] ?? "StartTls").ToLowerInvariant() switch
+        var sslMode = smtp.SslMode.ToLowerInvariant() switch
         {
             "none"              => MailKit.Security.SecureSocketOptions.None,
             "ssltls"            => MailKit.Security.SecureSocketOptions.SslOnConnect,
@@ -40,11 +42,9 @@ public class EmailService
         };
 
         using var client = new SmtpClient();
-        await client.ConnectAsync(host, port, sslMode);
-        var user = _cfg["Smtp:User"];
-        var pass = _cfg["Smtp:Password"];
-        if (!string.IsNullOrEmpty(user) && !string.IsNullOrEmpty(pass))
-            await client.AuthenticateAsync(user, pass);
+        await client.ConnectAsync(smtp.Host, smtp.Port, sslMode);
+        if (!string.IsNullOrEmpty(smtp.User) && !string.IsNullOrEmpty(smtp.Password))
+            await client.AuthenticateAsync(smtp.User, smtp.Password);
         await client.SendAsync(msg);
         await client.DisconnectAsync(true);
     }

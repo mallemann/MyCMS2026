@@ -10,6 +10,7 @@ public class Project
     public string Projektleiter { get; set; } = "";
     public DateTime? StartDatum { get; set; }
     public DateTime? EndDatum { get; set; }
+    public string Gruppe { get; set; } = "";
     public string LeseRolle { get; set; } = "Member";
     public string BearbeitenRolle { get; set; } = "Administrator";
     public List<JournalEntry> Journal { get; set; } = new();

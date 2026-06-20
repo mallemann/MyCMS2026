@@ -143,6 +143,17 @@ public class UserService
         return (true, "");
     }
 
+    /// <summary>Setzt das Passwort ohne andere Felder (Rollen, E-Mail etc.) zu ändern.</summary>
+    public async Task<bool> SetPasswordAsync(string userName, string newPassword)
+    {
+        var users = await LoadAsync();
+        var user = users.FirstOrDefault(u => u.UserName.Equals(userName, StringComparison.OrdinalIgnoreCase));
+        if (user == null) return false;
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        await SaveAsync(users);
+        return true;
+    }
+
     public async Task<bool> ChangePasswordAsync(string userName, string currentPassword, string newPassword)
     {
         var users = await LoadAsync();

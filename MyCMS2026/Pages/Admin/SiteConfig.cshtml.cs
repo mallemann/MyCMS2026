@@ -20,6 +20,12 @@ public class SiteConfigModel : PageModel
 
     public async Task<IActionResult> OnPostAsync()
     {
+        // Passwort-Feld leer = bestehendes Passwort beibehalten
+        if (string.IsNullOrEmpty(Config.Smtp.Password))
+        {
+            var current = await _site.GetAsync();
+            Config.Smtp.Password = current.Smtp.Password;
+        }
         await _site.SaveAsync(Config);
         _site.InvalidateCache();
         Message = "Konfiguration gespeichert.";

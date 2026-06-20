@@ -36,7 +36,42 @@
             <input asp-for="Config.FooterText" class="form-control" placeholder="Wird im Home-Widget unten angezeigt" />
         </div>
         <hr />
-        <h6>Weekly Mail</h6>
+        <h6 class="fw-semibold mb-3"><i class="bi bi-envelope me-1 text-muted"></i>Mail-Server (SMTP)</h6>
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">SMTP-Host</label>
+                <input asp-for="Config.Smtp.Host" class="form-control" placeholder="z.B. smtpauths.bluewin.ch" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">Port</label>
+                <input asp-for="Config.Smtp.Port" type="number" class="form-control" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">SSL-Modus</label>
+                <select asp-for="Config.Smtp.SslMode" class="form-select">
+                    <option value="StartTls">StartTLS (587)</option>
+                    <option value="SslOnConnect">SSL/TLS (465)</option>
+                    <option value="None">Kein SSL</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Absender-Adresse (From)</label>
+                <input asp-for="Config.Smtp.From" type="email" class="form-control" placeholder="absender@example.com" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Benutzername</label>
+                <input asp-for="Config.Smtp.User" class="form-control" placeholder="user@example.com" autocomplete="off" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Passwort</label>
+                <input asp-for="Config.Smtp.Password" type="password" class="form-control"
+                       placeholder="@(string.IsNullOrEmpty(Model.Config.Smtp.Password) ? "– leer –" : "••••••••")"
+                       autocomplete="new-password" />
+                <div class="form-text">Leer lassen = Passwort unverändert übernehmen.</div>
+            </div>
+        </div>
+        <hr />
+        <h6 class="fw-semibold mb-3"><i class="bi bi-send me-1 text-muted"></i>Weekly Mail</h6>
         <div class="mb-3 form-check">
             <input asp-for="Config.WeeklyMailEnabled" type="checkbox" class="form-check-input" />
             <label asp-for="Config.WeeklyMailEnabled" class="form-check-label">

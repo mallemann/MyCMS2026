@@ -14,6 +14,8 @@
     var search   = Context.Request.Query["search"].ToString();
     var status   = Context.Request.Query["status"].ToString();
     var klasse   = Context.Request.Query["klasse"].ToString();
+    var meine    = Context.Request.Query["meine"].ToString() == "1";
+    var userName = User.Identity?.Name ?? "";
 
     var all = await TodoSvc.GetAllAsync();
     if (!string.IsNullOrWhiteSpace(gruppe))
@@ -24,6 +26,9 @@
     if (status == "offen")    all = all.Where(t => !t.Erledigt).ToList();
     if (status == "erledigt") all = all.Where(t => t.Erledigt).ToList();
     if (!string.IsNullOrWhiteSpace(klasse)) all = all.Where(t => t.Klasse == klasse).ToList();
+    if (meine)
+        all = all.Where(t => (!string.IsNullOrEmpty(currentKuerzel) && t.Verantwortlich.Equals(currentKuerzel, StringComparison.OrdinalIgnoreCase))
+                           || (!string.IsNullOrEmpty(userName)       && t.Verantwortlich.Equals(userName,       StringComparison.OrdinalIgnoreCase))).ToList();
 
     int offene  = all.Count(t => !t.Erledigt);
     int overdue = all.Count(t => !t.Erledigt && t.ErledigenBis < DateTime.Today);
@@ -87,9 +92,14 @@
                 }
             </select>
         </div>
-        <div class="col-auto">
+        <div class="col-auto d-flex align-items-center gap-2">
+            <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" name="meine" value="1" id="wTodoMeine"
+                       @(meine ? "checked" : "") onchange="this.form.submit()" />
+                <label class="form-check-label small text-nowrap" for="wTodoMeine">Meine</label>
+            </div>
             <button type="submit" class="btn btn-cms btn-sm"><i class="bi bi-funnel me-1"></i>Filter</button>
-            <a href="/Page/Index?Id=@pageId" class="btn btn-outline-secondary btn-sm ms-1">Reset</a>
+            <a href="/Page/Index?Id=@pageId" class="btn btn-outline-secondary btn-sm">Reset</a>
         </div>
     </form>
 </div>

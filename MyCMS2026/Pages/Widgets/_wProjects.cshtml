@@ -114,11 +114,14 @@ else
                         {
                             <span class="small text-muted"><i class="bi bi-journal-text"></i> @p.Journal.Count</span>
                         }
-                        @if (isAdmin)
+                        @if (ProjectSvc.CanEdit(p, isAdmin, userRoles))
                         {
                             <a asp-page="/Projects/Edit" asp-route-id="@p.Id" class="btn btn-sm btn-outline-secondary" title="Bearbeiten">
                                 <i class="bi bi-pencil"></i>
                             </a>
+                        }
+                        @if (isAdmin)
+                        {
                             <button type="button" class="btn btn-sm btn-outline-danger" title="Löschen"
                                     onclick="cmsConfirmDelete('delProj-@p.Id', 'Projekt «@p.Name.Replace("'", "\\'")» wirklich löschen?')">
                                 <i class="bi bi-trash"></i>
