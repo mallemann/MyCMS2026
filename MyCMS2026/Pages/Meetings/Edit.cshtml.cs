@@ -136,10 +136,11 @@ public class MeetingEditModel : PageModel
             return Page();
         }
 
-        var userName = User.Identity?.Name ?? "";
-        var isAdmin  = User.IsInRole("Administrator");
-        var gruppe   = Meeting.Gruppe;
-        var retProj  = ReturnProjectId;   // wohin nach dem Speichern zurückkehren
+        var userName  = User.Identity?.Name ?? "";
+        var isAdmin   = User.IsInRole("Administrator");
+        var gruppe    = Meeting.Gruppe;
+        var retProj   = ReturnProjectId;
+        var isNewItem = string.IsNullOrEmpty(Meeting.Id);   // vor CreateAsync merken
 
         if (string.IsNullOrEmpty(Meeting.Id))
         {
@@ -165,7 +166,12 @@ public class MeetingEditModel : PageModel
         if (!string.IsNullOrEmpty(ReturnPageId))
             return RedirectToPage("/Page/Index", new { id = ReturnPageId });
         if (!string.IsNullOrEmpty(retProj))
+        {
+            if (isNewItem)
+                return RedirectToPage("/Projects/Detail",
+                    new { id = retProj, tab = "meetings", promptJournal = Meeting.Id, promptType = "meeting" });
             return RedirectToPage("/Projects/Detail", new { id = retProj, tab = "meetings" });
+        }
         return RedirectToPage("Index", new { gruppe = string.IsNullOrWhiteSpace(gruppe) ? null : gruppe });
     }
 

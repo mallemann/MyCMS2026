@@ -180,11 +180,40 @@
                     <div class="card mb-3 border-0 shadow-sm" id="entry-@entry.Id"
                          style="border-left: 4px solid @accent !important;">
 
-                        @* Header *@
-                        <div class="card-header d-flex justify-content-between align-items-start gap-2 py-2 px-3"
-                             style="background: @bgTint; border-bottom: 1px solid rgba(0,0,0,.06);">
+                        @* Header – klickbar zum Auf-/Zuklappen *@
+                        <div class="card-header d-flex justify-content-between align-items-start gap-2 py-2 px-3 journal-header"
+                             style="background: @bgTint; border-bottom: 1px solid rgba(0,0,0,.06); cursor: pointer;"
+                             data-journal-target="#jBody-@entry.Id" aria-expanded="false">
                             <div class="flex-fill min-w-0">
                                 <div class="fw-bold" style="color: @accent;">@entry.Titel</div>
+                                @* Link-Badge für verknüpfte Aufgabe / Sitzung – Wrapper stoppt Collapse-Trigger *@
+                                @if (!string.IsNullOrEmpty(entry.LinkedTodoId) || !string.IsNullOrEmpty(entry.LinkedMeetingId))
+                                {
+                                    <div class="d-inline-block mt-1">
+                                    @if (!string.IsNullOrEmpty(entry.LinkedTodoId))
+                                    {
+                                        var lt = Model.Todos.FirstOrDefault(t => t.Id == entry.LinkedTodoId);
+                                        <a asp-page="/Todos/Detail" asp-route-id="@entry.LinkedTodoId"
+                                           asp-route-returnProjectId="@p.Id"
+                                           class="badge text-decoration-none me-1"
+                                           style="background:@accent; font-weight:normal;"
+                                           title="Verknüpfte Aufgabe öffnen">
+                                            <i class="bi bi-check2-square me-1"></i>Aufgabe @(lt?.TaskNr.ToString() ?? "")
+                                        </a>
+                                    }
+                                    @if (!string.IsNullOrEmpty(entry.LinkedMeetingId))
+                                    {
+                                        var lm = Model.Meetings.FirstOrDefault(m => m.Id == entry.LinkedMeetingId);
+                                        <a asp-page="/Meetings/Detail" asp-route-id="@entry.LinkedMeetingId"
+                                           asp-route-returnProjectId="@p.Id"
+                                           class="badge text-decoration-none me-1"
+                                           style="background:@accent; font-weight:normal;"
+                                           title="Verknüpfte Sitzung öffnen">
+                                            <i class="bi bi-calendar-event me-1"></i>Sitzung @(lm?.MeetingNr.ToString() ?? "")
+                                        </a>
+                                    }
+                                    </div>
+                                }
                                 <div class="small text-muted mt-1">
                                     <i class="bi bi-person me-1"></i>@entry.CreatedBy
                                     @if (entry.UpdatedAt > entry.CreatedAt.AddMinutes(1))
@@ -204,7 +233,7 @@
                                 </div>
                                 @if (Model.CanEdit)
                                 {
-                                    <div class="d-flex gap-1">
+                                    <div class="d-flex gap-1" onclick="event.stopPropagation()">
                                         <button type="button" class="btn btn-sm btn-outline-secondary"
                                                 onclick="projToggleEdit('@entry.Id')" title="Bearbeiten">
                                             <i class="bi bi-pencil"></i>
@@ -220,8 +249,12 @@
                                         </button>
                                     </div>
                                 }
+                                <i class="bi bi-chevron-down journal-chevron ms-1" style="color: @accent; transition: transform .2s;"></i>
                             </div>
                         </div>
+
+                        @* Kollabierbare Inhalte *@
+                        <div id="jBody-@entry.Id" class="collapse">
 
                         @* View mode *@
                         <div id="view-@entry.Id" class="card-body px-3 py-3">
@@ -296,6 +329,8 @@
                             }
                         </div>
                         }@* /if comments || canComment *@
+
+                        </div>@* /collapse jBody *@
                     </div>
                 }
             }
@@ -368,7 +403,7 @@
                                 <th>Verantwortlich</th>
                                 <th>Bis</th>
                                 <th>Status</th>
-                                @if (Model.CanEdit) { <th></th> }
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -376,9 +411,7 @@
                             {
                                 <tr class="@(t.Erledigt ? "text-muted" : "")">
                                     <td>@t.TaskNr</td>
-                                    <td>
-                                        <a asp-page="/Todos/Edit" asp-route-id="@t.Id">@t.Thema</a>
-                                    </td>
+                                    <td>@t.Thema</td>
                                     <td>@t.Verantwortlich</td>
                                     <td>@t.ErledigenBis.ToString("dd.MM.yyyy")</td>
                                     <td>
@@ -391,9 +424,13 @@
                                             <span class="badge bg-secondary">Offen</span>
                                         }
                                     </td>
-                                    @if (Model.CanEdit)
-                                    {
-                                        <td class="text-nowrap">
+                                    <td class="text-nowrap">
+                                        <a asp-page="/Todos/Detail" asp-route-id="@t.Id" asp-route-returnProjectId="@p.Id"
+                                           class="btn btn-sm btn-outline-primary" title="Öffnen">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        @if (Model.CanEdit)
+                                        {
                                             <a asp-page="/Todos/Edit" asp-route-id="@t.Id"
                                                class="btn btn-sm btn-outline-secondary" title="Bearbeiten">
                                                 <i class="bi bi-pencil"></i>
@@ -415,8 +452,8 @@
                                                     <i class="bi bi-x-circle"></i>
                                                 </button>
                                             </form>
-                                        </td>
-                                    }
+                                        }
+                                    </td>
                                 </tr>
                             }
                         </tbody>
@@ -492,7 +529,7 @@
                                 <th>Thema</th>
                                 <th>Leitung</th>
                                 <th>Status</th>
-                                @if (Model.CanEdit) { <th></th> }
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -501,18 +538,20 @@
                                 <tr>
                                     <td>@m.MeetingNr</td>
                                     <td>@m.Datum.ToString("dd.MM.yyyy")</td>
-                                    <td>
-                                        <a asp-page="/Meetings/Edit" asp-route-id="@m.Id">@m.Thema</a>
-                                    </td>
+                                    <td>@m.Thema</td>
                                     <td>@m.Leitung</td>
                                     <td>
                                         <span class="badge @(m.Status == "Abgeschlossen" ? "bg-success" : m.Status == "Abgesagt" ? "bg-danger" : "bg-secondary")">
                                             @m.Status
                                         </span>
                                     </td>
-                                    @if (Model.CanEdit)
-                                    {
-                                        <td class="text-nowrap">
+                                    <td class="text-nowrap">
+                                        <a asp-page="/Meetings/Detail" asp-route-id="@m.Id" asp-route-returnProjectId="@p.Id"
+                                           class="btn btn-sm btn-outline-primary" title="Öffnen">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        @if (Model.CanEdit)
+                                        {
                                             <a asp-page="/Meetings/Edit" asp-route-id="@m.Id"
                                                class="btn btn-sm btn-outline-secondary" title="Bearbeiten">
                                                 <i class="bi bi-pencil"></i>
@@ -526,8 +565,8 @@
                                                     <i class="bi bi-x-circle"></i>
                                                 </button>
                                             </form>
-                                        </td>
-                                    }
+                                        }
+                                    </td>
                                 </tr>
                             }
                         </tbody>
@@ -539,12 +578,91 @@
     </div>@* /cms-page-body *@
 </div>
 
+@* ── Journal-Prompt Modal ────────────────────────────────────────────── *@
+@if (!string.IsNullOrEmpty(Model.PromptJournalId) && Model.CanEdit)
+{
+<div class="modal fade" id="modalJournalPrompt" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-journal-plus me-2"></i>Journaleintrag erstellen?</h5>
+            </div>
+            <div class="modal-body">
+                <p>Möchten Sie für <strong>@Model.PromptJournalTitle</strong> einen Journaleintrag anlegen?</p>
+                <p class="text-muted small">Der Eintrag wird direkt im Bearbeiten-Modus geöffnet, damit Sie ergänzende Notizen hinzufügen können.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Nein, danke</button>
+                <form method="post" asp-page-handler="AddLinkedJournal" class="d-inline">
+                    <input type="hidden" name="id" value="@Model.Project.Id" />
+                    <input type="hidden" name="linkedItemId" value="@Model.PromptJournalId" />
+                    <input type="hidden" name="promptType" value="@Model.PromptJournalType" />
+                    <button type="submit" class="btn btn-cms">
+                        <i class="bi bi-journal-plus me-1"></i>Ja, Journaleintrag erstellen
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+}
+
 @section Scripts {
 <script>
 function projToggleEdit(entryId) {
+    // Beim Bearbeiten den Collapse zuerst aufmachen
+    var body = document.getElementById('jBody-' + entryId);
+    if (body && !body.classList.contains('show')) {
+        bootstrap.Collapse.getOrCreateInstance(body).show();
+    }
     document.getElementById('view-' + entryId).classList.toggle('d-none');
     document.getElementById('edit-' + entryId).classList.toggle('d-none');
 }
+
+// Journal-Header: manueller Toggle – ignoriert Klicks auf Links, Buttons und Formulare
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.journal-header[data-journal-target]').forEach(function (header) {
+        var targetId = header.getAttribute('data-journal-target');
+        var target = document.querySelector(targetId);
+        var chevron = header.querySelector('.journal-chevron');
+        if (!target) return;
+
+        // Chevron-Animation bei Collapse-Events
+        if (chevron) {
+            target.addEventListener('show.bs.collapse', function () {
+                chevron.style.transform = 'rotate(-180deg)';
+                header.setAttribute('aria-expanded', 'true');
+            });
+            target.addEventListener('hide.bs.collapse', function () {
+                chevron.style.transform = 'rotate(0deg)';
+                header.setAttribute('aria-expanded', 'false');
+            });
+        }
+
+        // Click auf Header: Toggle nur wenn kein Link / Button / Form angeklickt
+        header.addEventListener('click', function (e) {
+            if (e.target.closest('a, button, form')) return;
+            bootstrap.Collapse.getOrCreateInstance(target).toggle();
+        });
+    });
+
+    // Journal-Prompt Modal automatisch anzeigen
+    var promptModal = document.getElementById('modalJournalPrompt');
+    if (promptModal) {
+        bootstrap.Modal.getOrCreateInstance(promptModal).show();
+    }
+
+    // Journaleintrag automatisch im Edit-Modus öffnen (nach Erstellung)
+    var openEntry = '@Model.OpenEntryId';
+    if (openEntry) {
+        // Kurze Verzögerung damit Collapse initialisiert ist
+        setTimeout(function () {
+            projToggleEdit(openEntry);
+            var el = document.getElementById('entry-' + openEntry);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 150);
+    }
+});
 </script>
 @if (Model.CanEdit)
 {

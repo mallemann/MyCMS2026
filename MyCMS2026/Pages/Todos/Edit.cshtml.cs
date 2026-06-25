@@ -140,10 +140,11 @@ public class TodoEditModel : PageModel
             return Page();
         }
 
-        var userName = User.Identity?.Name ?? "";
-        var isAdmin  = User.IsInRole("Administrator");
-        var gruppe   = Todo.Gruppe;
-        var retProj  = ReturnProjectId;   // wohin nach dem Speichern zurückkehren
+        var userName  = User.Identity?.Name ?? "";
+        var isAdmin   = User.IsInRole("Administrator");
+        var gruppe    = Todo.Gruppe;
+        var retProj   = ReturnProjectId;
+        var isNewItem = string.IsNullOrEmpty(Todo.Id);   // vor CreateAsync merken
 
         if (string.IsNullOrEmpty(Todo.Id))
         {
@@ -173,7 +174,12 @@ public class TodoEditModel : PageModel
         if (!string.IsNullOrEmpty(ReturnPageId))
             return RedirectToPage("/Page/Index", new { id = ReturnPageId });
         if (!string.IsNullOrEmpty(retProj))
+        {
+            if (isNewItem)
+                return RedirectToPage("/Projects/Detail",
+                    new { id = retProj, tab = "todos", promptJournal = Todo.Id, promptType = "todo" });
             return RedirectToPage("/Projects/Detail", new { id = retProj, tab = "todos" });
+        }
         return RedirectToPage("Index", new { gruppe = string.IsNullOrWhiteSpace(gruppe) ? null : gruppe });
     }
 

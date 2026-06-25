@@ -25,8 +25,16 @@ public class ProjectDetailModel : PageModel
     public List<Meeting> Meetings { get; private set; } = new();
     public bool IsAdmin { get; private set; }
     public bool CanEdit { get; private set; }
-    public bool CanComment { get; private set; }   // lesen = kommentieren dürfen
+    public bool CanComment { get; private set; }
     public string? ActiveTab { get; private set; }
+
+    // Journal-Prompt nach Zuweisung
+    public string? PromptJournalId { get; private set; }
+    public string? PromptJournalType { get; private set; }
+    public string? PromptJournalTitle { get; private set; }
+
+    // Auto-öffnen eines Eintrags nach Erstellung
+    public string? OpenEntryId { get; private set; }
 
     private async Task<bool> LoadProjectAsync(string id)
     {
@@ -41,7 +49,7 @@ public class ProjectDetailModel : PageModel
 
         Project    = project;
         CanEdit    = _projects.CanEdit(project, IsAdmin, userRoles);
-        CanComment = true;   // wer lesen darf, darf auch kommentieren
+        CanComment = true;
 
         var allTodos    = await _todos.GetAllAsync();
         var allMeetings = await _meetings.GetAllAsync();
@@ -51,10 +59,29 @@ public class ProjectDetailModel : PageModel
         return true;
     }
 
-    public async Task<IActionResult> OnGetAsync(string id, string? tab)
+    public async Task<IActionResult> OnGetAsync(string id, string? tab,
+        string? promptJournal, string? promptType, string? openEntry)
     {
         if (!await LoadProjectAsync(id)) return NotFound();
-        ActiveTab = tab ?? "journal";
+        ActiveTab   = tab ?? "journal";
+        OpenEntryId = openEntry;
+
+        // Journal-Prompt: Item-Titel für Anzeige im Modal ermitteln
+        if (!string.IsNullOrEmpty(promptJournal) && CanEdit)
+        {
+            PromptJournalId   = promptJournal;
+            PromptJournalType = promptType;
+            if (promptType == "todo")
+            {
+                var t = await _todos.GetByIdAsync(promptJournal);
+                PromptJournalTitle = t != null ? $"Aufgabe #{t.TaskNr}: {t.Thema}" : null;
+            }
+            else
+            {
+                var m = await _meetings.GetByIdAsync(promptJournal);
+                PromptJournalTitle = m != null ? $"Sitzung #{m.MeetingNr}: {m.Thema}" : null;
+            }
+        }
         return Page();
     }
 
@@ -66,6 +93,36 @@ public class ProjectDetailModel : PageModel
         if (!CanEdit) return Forbid();
         await _projects.AddJournalEntryAsync(id, titel, content, User.Identity?.Name ?? "");
         return RedirectToPage(new { id, tab = "journal" });
+    }
+
+    // Verknüpften Journal-Eintrag anlegen (aus Prompt-Modal)
+    public async Task<IActionResult> OnPostAddLinkedJournalAsync(
+        string id, string linkedItemId, string promptType)
+    {
+        if (!await LoadProjectAsync(id)) return NotFound();
+        if (!CanEdit) return Forbid();
+
+        string titel;
+        string? linkedTodoId    = null;
+        string? linkedMeetingId = null;
+
+        if (promptType == "todo")
+        {
+            var t = await _todos.GetByIdAsync(linkedItemId);
+            titel        = t != null ? $"Aufgabe #{t.TaskNr}: {t.Thema}" : "Aufgabe";
+            linkedTodoId = linkedItemId;
+        }
+        else
+        {
+            var m = await _meetings.GetByIdAsync(linkedItemId);
+            titel           = m != null ? $"Sitzung #{m.MeetingNr}: {m.Thema}" : "Sitzung";
+            linkedMeetingId = linkedItemId;
+        }
+
+        var entry = await _projects.AddLinkedJournalEntryAsync(
+            id, titel, User.Identity?.Name ?? "", linkedTodoId, linkedMeetingId);
+
+        return RedirectToPage(new { id, tab = "journal", openEntry = entry?.Id });
     }
 
     public async Task<IActionResult> OnPostUpdateJournalAsync(string id, string entryId, string titel, string content)
@@ -89,7 +146,6 @@ public class ProjectDetailModel : PageModel
     public async Task<IActionResult> OnPostAddCommentAsync(string id, string entryId, string text)
     {
         if (!await LoadProjectAsync(id)) return NotFound();
-        // Leserecht reicht zum Kommentieren
         await _projects.AddCommentAsync(id, entryId, text, User.Identity?.Name ?? "");
         return RedirectToPage(new { id, tab = "journal" });
     }
@@ -102,7 +158,7 @@ public class ProjectDetailModel : PageModel
         return RedirectToPage(new { id, tab = "journal" });
     }
 
-    // ── Assign existing Todo / Meeting ───────────────────────────────────────
+    // ── Assign / Remove Todo ─────────────────────────────────────────────────
 
     public async Task<IActionResult> OnPostAssignTodoAsync(string id, string todoId)
     {
@@ -114,13 +170,21 @@ public class ProjectDetailModel : PageModel
             todo.ProjectId = id;
             await _todos.UpdateAsync(todo, new List<IFormFile>());
         }
-        return RedirectToPage(new { id, tab = "todos" });
+        return RedirectToPage(new { id, tab = "todos", promptJournal = todoId, promptType = "todo" });
     }
 
     public async Task<IActionResult> OnPostRemoveTodoAsync(string id, string todoId)
     {
         if (!await LoadProjectAsync(id)) return NotFound();
         if (!CanEdit) return Forbid();
+
+        // Verknüpfte Journal-Einträge entfernen
+        var toDelete = Project.Journal
+            .Where(e => e.LinkedTodoId == todoId)
+            .Select(e => e.Id).ToList();
+        foreach (var entryId in toDelete)
+            await _projects.DeleteJournalEntryAsync(id, entryId);
+
         var todo = await _todos.GetByIdAsync(todoId);
         if (todo != null)
         {
@@ -140,7 +204,7 @@ public class ProjectDetailModel : PageModel
         return RedirectToPage(new { id, tab = "todos" });
     }
 
-    // ── Assign existing Todo / Meeting ───────────────────────────────────────
+    // ── Assign / Remove Meeting ───────────────────────────────────────────────
 
     public async Task<IActionResult> OnPostAssignMeetingAsync(string id, string meetingId)
     {
@@ -152,13 +216,21 @@ public class ProjectDetailModel : PageModel
             meeting.ProjectId = id;
             await _meetings.UpdateAsync(meeting, new List<IFormFile>());
         }
-        return RedirectToPage(new { id, tab = "meetings" });
+        return RedirectToPage(new { id, tab = "meetings", promptJournal = meetingId, promptType = "meeting" });
     }
 
     public async Task<IActionResult> OnPostRemoveMeetingAsync(string id, string meetingId)
     {
         if (!await LoadProjectAsync(id)) return NotFound();
         if (!CanEdit) return Forbid();
+
+        // Verknüpfte Journal-Einträge entfernen
+        var toDelete = Project.Journal
+            .Where(e => e.LinkedMeetingId == meetingId)
+            .Select(e => e.Id).ToList();
+        foreach (var entryId in toDelete)
+            await _projects.DeleteJournalEntryAsync(id, entryId);
+
         var meeting = await _meetings.GetByIdAsync(meetingId);
         if (meeting != null)
         {

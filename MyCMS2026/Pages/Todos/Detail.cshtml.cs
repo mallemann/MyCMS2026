@@ -14,14 +14,16 @@ public class TodoDetailModel : PageModel
 
     public TodoItem? Todo { get; set; }
     public string? ReturnPageId { get; set; }
+    public string? ReturnProjectId { get; set; }
     public string? Gruppe { get; set; }
 
-    public async Task<IActionResult> OnGetAsync(string? id, string? returnPageId, string? gruppe)
+    public async Task<IActionResult> OnGetAsync(string? id, string? returnPageId, string? returnProjectId, string? gruppe)
     {
         if (string.IsNullOrEmpty(id)) return NotFound();
         Todo = await _todos.GetByIdAsync(id);
         if (Todo == null) return NotFound();
         ReturnPageId = returnPageId;
+        ReturnProjectId = returnProjectId;
         Gruppe = gruppe;
         return Page();
     }

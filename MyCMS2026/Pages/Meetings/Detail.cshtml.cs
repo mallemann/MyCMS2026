@@ -14,14 +14,16 @@ public class MeetingDetailModel : PageModel
 
     public Meeting? Meeting { get; set; }
     public string? ReturnPageId { get; set; }
+    public string? ReturnProjectId { get; set; }
     public string? Gruppe { get; set; }
 
-    public async Task<IActionResult> OnGetAsync(string? id, string? returnPageId, string? gruppe)
+    public async Task<IActionResult> OnGetAsync(string? id, string? returnPageId, string? returnProjectId, string? gruppe)
     {
         if (string.IsNullOrEmpty(id)) return NotFound();
         Meeting = await _meetings.GetByIdAsync(id);
         if (Meeting == null) return NotFound();
         ReturnPageId = returnPageId;
+        ReturnProjectId = returnProjectId;
         Gruppe = gruppe;
         return Page();
     }

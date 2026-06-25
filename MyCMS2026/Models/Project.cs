@@ -32,6 +32,9 @@ public class JournalEntry
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public string UpdatedBy { get; set; } = "";
     public List<JournalComment> Comments { get; set; } = new();
+    // Optionale Verknüpfung mit einer Aufgabe oder Sitzung
+    public string? LinkedTodoId { get; set; }
+    public string? LinkedMeetingId { get; set; }
 }
 
 public class JournalComment

@@ -132,6 +132,53 @@ public class ProjectService
 
     // ── Journal CRUD ─────────────────────────────────────────────────────────
 
+    // Entfernt alle Journal-Einträge über ALLE Projekte, die mit dem angegebenen Item verknüpft sind
+    public async Task RemoveJournalEntriesByLinkedItemAsync(string linkedItemId)
+    {
+        var items = await LoadAsync();
+        bool changed = false;
+        foreach (var project in items)
+        {
+            var toRemove = project.Journal
+                .Where(e => e.LinkedTodoId == linkedItemId || e.LinkedMeetingId == linkedItemId)
+                .ToList();
+            if (toRemove.Any())
+            {
+                foreach (var e in toRemove) project.Journal.Remove(e);
+                changed = true;
+            }
+        }
+        if (changed) await SaveAsync(items);
+    }
+
+    // Verknüpfter Journal-Eintrag (mit optionalem Link zu Todo/Meeting)
+    public async Task<JournalEntry?> AddLinkedJournalEntryAsync(
+        string projectId, string titel, string createdBy,
+        string? linkedTodoId = null, string? linkedMeetingId = null)
+    {
+        var items = await LoadAsync();
+        var project = items.FirstOrDefault(p => p.Id == projectId);
+        if (project == null) return null;
+        var entry = new JournalEntry
+        {
+            Id              = Guid.NewGuid().ToString(),
+            Titel           = titel,
+            Content         = "",
+            CreatedAt       = DateTime.UtcNow,
+            UpdatedAt       = DateTime.UtcNow,
+            CreatedBy       = createdBy,
+            UpdatedBy       = createdBy,
+            Comments        = new List<JournalComment>(),
+            LinkedTodoId    = linkedTodoId,
+            LinkedMeetingId = linkedMeetingId
+        };
+        project.Journal.Insert(0, entry);
+        project.UpdatedAt = DateTime.UtcNow;
+        project.UpdatedBy = createdBy;
+        await SaveAsync(items);
+        return entry;
+    }
+
     public async Task<JournalEntry?> AddJournalEntryAsync(string projectId, string titel, string content, string createdBy)
     {
         var items = await LoadAsync();

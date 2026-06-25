@@ -10,7 +10,12 @@ namespace MyCMS2026.Pages.Meetings;
 public class MeetingsIndexModel : PageModel
 {
     private readonly MeetingService _meetings;
-    public MeetingsIndexModel(MeetingService meetings) => _meetings = meetings;
+    private readonly ProjectService _projects;
+    public MeetingsIndexModel(MeetingService meetings, ProjectService projects)
+    {
+        _meetings = meetings;
+        _projects = projects;
+    }
 
     public List<Meeting> Meetings { get; set; } = new();
     public string? Search { get; set; }
@@ -49,6 +54,8 @@ public class MeetingsIndexModel : PageModel
     public async Task<IActionResult> OnPostDeleteAsync(string id, string? gruppe)
     {
         if (!User.IsInRole("Administrator")) return Forbid();
+        // Verknüpfte Journal-Einträge in allen Projekten entfernen
+        await _projects.RemoveJournalEntriesByLinkedItemAsync(id);
         await _meetings.DeleteAsync(id);
         return RedirectToPage(new { gruppe });
     }

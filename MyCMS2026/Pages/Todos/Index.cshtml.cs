@@ -11,7 +11,13 @@ public class TodosIndexModel : PageModel
 {
     private readonly TodoService _todos;
     private readonly NavigationService _nav;
-    public TodosIndexModel(TodoService todos, NavigationService nav) { _todos = todos; _nav = nav; }
+    private readonly ProjectService _projects;
+    public TodosIndexModel(TodoService todos, NavigationService nav, ProjectService projects)
+    {
+        _todos    = todos;
+        _nav      = nav;
+        _projects = projects;
+    }
 
     public List<TodoItem> Todos { get; set; } = new();
     public string? Search { get; set; }
@@ -81,6 +87,8 @@ public class TodosIndexModel : PageModel
     public async Task<IActionResult> OnPostDeleteAsync(string id, string? gruppe)
     {
         if (!User.IsInRole("Administrator")) return Forbid();
+        // Verknüpfte Journal-Einträge in allen Projekten entfernen
+        await _projects.RemoveJournalEntriesByLinkedItemAsync(id);
         await _todos.DeleteAsync(id);
         return RedirectToPage(new { gruppe });
     }

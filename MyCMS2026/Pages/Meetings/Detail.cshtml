@@ -35,6 +35,12 @@ else
                     <i class="bi bi-arrow-left me-1"></i>Zurück
                 </a>
             }
+            else if (!string.IsNullOrEmpty(Model.ReturnProjectId))
+            {
+                <a asp-page="/Projects/Detail" asp-route-id="@Model.ReturnProjectId" asp-route-tab="meetings" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-left me-1"></i>Zurück zum Projekt
+                </a>
+            }
             else
             {
                 <a asp-page="Index" asp-route-gruppe="@Model.Gruppe" class="btn btn-outline-secondary btn-sm">
