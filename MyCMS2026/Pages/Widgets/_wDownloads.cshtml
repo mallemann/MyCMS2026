@@ -139,8 +139,8 @@
     <table class="table table-hover table-sm align-middle mb-0">
         <thead>
             <tr>
-                <th>Beschreibung</th>
-                <th>Dateiname</th>
+                <th style="max-width:130px">Beschreibung</th>
+                <th style="max-width:200px">Dateiname</th>
                 <th>Klasse</th>
                 <th>Erstellt</th>
                 <th>Grösse</th>
@@ -159,11 +159,13 @@
     else                                       icon = "bi-file-earmark text-secondary";
 
             <tr>
-                <td>@(string.IsNullOrEmpty(d.Beschreibung) ? "–" : d.Beschreibung)</td>
-                <td>
-                    <i class="bi @icon me-1"></i>
-                    <a asp-page="/Downloads/File" asp-route-storedName="@d.StoredName"
-                       class="text-decoration-none">@d.OriginalName</a>
+                <td style="max-width:130px"><div class="text-truncate small text-muted">@(string.IsNullOrEmpty(d.Beschreibung) ? "–" : d.Beschreibung)</div></td>
+                <td style="max-width:200px">
+                    <div class="text-truncate">
+                        <i class="bi @icon me-1"></i>
+                        <a asp-page="/Downloads/File" asp-route-storedName="@d.StoredName" asp-route-fileName="@d.OriginalName"
+                           class="text-decoration-none">@d.OriginalName</a>
+                    </div>
                 </td>
                 <td>
                     @if (!string.IsNullOrEmpty(d.Klasse))
@@ -174,7 +176,7 @@
                 <td class="text-muted small text-nowrap">@d.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")</td>
                 <td class="text-muted small text-nowrap">@(d.Size / 1024) KB</td>
                 <td class="text-end text-nowrap">
-                    <a asp-page="/Downloads/File" asp-route-storedName="@d.StoredName"
+                    <a asp-page="/Downloads/File" asp-route-storedName="@d.StoredName" asp-route-fileName="@d.OriginalName"
                        class="btn btn-sm btn-outline-primary" title="Herunterladen">
                         <i class="bi bi-download"></i>
                     </a>

@@ -1,10 +1,24 @@
 Migrations Prompts
 
+Vorher in MyCMS die Files und JSON löschen
+
 ToDos:
-Im Albatros-modern Projekt CoWork-Root\Projects\Albatros\Albatros-Modern\2026\Albatros findest du ToDo Daten (JSON und Files). Kannst du diese in MyCMS ToDos Übernehmen? Todos im Albatros-Modern projekt hat ein bool: VisibleVR. Wenn dieser True ist ist die Gruppe des ToDos in mycms VR, bei false ist die Gruppe Albatros. Hast du Fragen bevor du beginnst?
+Im Albatros-modern Projekt CoWork-Root\Projects\Albatros\Albatros-Modern\2026\Albatros findest du ToDo Daten (JSON und Files). Kannst du diese in MyCMS ToDos Übernehmen? Todos im Albatros-Modern projekt hat ein bool: VisibleVR. Wenn dieser True ist ist die Gruppe des ToDos in mycms VR, bei false ist die Gruppe Albatros. Hast du Fragen bevor du beginnst? 
 
 Meetings:
 Im Albatros-modern Projekt CoWork-Root\Projects\Albatros\Albatros-Modern\2026\Albatros findest du Meetings Daten (JSON und Files). Kannst du diese in MyCMS Meetings Übernehmen? Meetings im Albatros-Modern projekt hat ein bool: VisibleVR. Wenn dieser True ist ist die Gruppe des ToDos in mycms VR, bei false ist die Gruppe Albatros. Hast du Fragen bevor du beginnst?
 
 Downloads:
-Im Albatros-modern Projekt CoWork-Root\Projects\Albatros\Albatros-Modern\2026\Albatros findest du Downloads Daten (JSON und Files). Kannst du diese in MyCMS Downloads Übernehmen? 
+Im Albatros-modern Projekt CoWork-Root\Projects\Albatros\Albatros-Modern\2026\Albatros findest du Downloads Daten (JSON und Files). Kannst du diese in MyCMS Downloads Übernehmen? Hast du Fragen bevor du beginnst?
+ 
+
+OKRs:
+Im Albatros-modern Projekt CoWork-Root\Projects\Albatros\Albatros-Modern\2026\Albatros findest du OKRs (JSON). Kannst du diese nach MyCMS OKRs übernehmen? Am besten alles ersetzen in MyCMS. Fragen?
+
+History:
+Kannst du prüfen und ergänzen wenn nötig: die importierten Datensätze für ToDos sollten einen History Eintrag haben in der Form: 
+{
+        "Timestamp": " ....",
+        "User": "Import",
+        "Aktion": "Migriert aus Albatros-Modern (Original Nr. ...)"
+}

@@ -1,0 +1,353 @@
+@model MyCMS2026.Pages.Page.PageIndexModel
+@using MyCMS2026.Services
+@using MyCMS2026.Models
+@using System.Text.RegularExpressions
+@inject TodoService TodoSvc
+@inject MeetingService MeetingSvc
+@inject DownloadService DownloadSvc
+@inject ProjectService ProjectSvc
+@inject PendenzService PendenzSvc
+@inject WeeklyMailService WeeklyMailSvc
+@{
+    var q            = Context.Request.Query["q"].ToString().Trim();
+    var userName     = User.Identity?.Name ?? "";
+    var kuerzel      = User.FindFirst("Kuerzel")?.Value ?? "";
+    var isAdmin      = User.IsInRole("Administrator");
+    var userRoles    = User.Claims
+        .Where(c => c.Type == System.Security.Claims.ClaimTypes.Role)
+        .Select(c => c.Value).ToList();
+    var pageId       = Model.Id;
+
+    // Reporting-Einstellungen für aktuellen User (gleiche Filterlogik wie Weekly Mail)
+    var cfg          = await WeeklyMailSvc.GetConfigAsync();
+    var recipient    = cfg.Recipients.FirstOrDefault(r =>
+        r.UserId.Equals(userName, StringComparison.OrdinalIgnoreCase));
+    var allowedGruppen = recipient?.AllowedGruppen ?? new List<string>();
+
+    // ── Hilfsmethoden ────────────────────────────────────────────────────────
+    string StripHtml(string? s) => string.IsNullOrEmpty(s) ? "" :
+        Regex.Replace(s, "<[^>]+>", " ").Trim();
+
+    // Normalisiert: nur alphanumerisch + Umlaute, lowercase
+    string Norm(string? s) => string.IsNullOrEmpty(s) ? "" :
+        Regex.Replace(s.ToLowerInvariant(), @"[^a-z0-9äöüàáâãèéêëìíîïòóôõùúûý]", "");
+
+    // Tokens aus dem Suchstring (getrennt durch Nicht-Alphanumerisch)
+    var tokens = Regex.Split(q, @"[^a-zA-Z0-9äöüÄÖÜàáâãèéêëìíîïòóôõùúûý]+")
+        .Where(t => t.Length > 0).ToArray();
+    var normQ = Norm(q);
+
+    // Mehrstufiges Matching gegen einen kombinierten Feldtext:
+    // S1: alle Tokens als Substring (case-insensitive, Reihenfolge egal)
+    // S2: normalisierter Query als Substring in normalisiertem Text
+    // S3: bei 1 Token (kein Trennzeichen) → alle 2-Teil-Splits testen (min. 3 Zeichen pro Teil)
+    bool Matches(string combined)
+    {
+        if (string.IsNullOrEmpty(combined)) return false;
+        // S1
+        if (tokens.All(t => combined.Contains(t, StringComparison.OrdinalIgnoreCase))) return true;
+        // S2
+        var normC = Norm(combined);
+        if (normQ.Length > 0 && normC.Contains(normQ)) return true;
+        // S3
+        if (tokens.Length == 1 && normQ.Length >= 6)
+        {
+            for (int i = 3; i <= normQ.Length - 3; i++)
+            {
+                if (normC.Contains(normQ[..i]) && normC.Contains(normQ[i..]))
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    string CombineTodo(TodoItem t) => string.Join(" ",
+        t.Thema, t.Verantwortlich, t.Beschreibung, t.Klasse, t.Gruppe,
+        string.Join(" ", t.Files.Select(f => f.OriginalName)));
+    string CombineMeeting(Meeting m) => string.Join(" ",
+        m.Thema, m.Leitung, m.Beschreibung, m.Status, m.Klasse, m.Gruppe,
+        StripHtml(m.Content), string.Join(" ", m.Files.Select(f => f.OriginalName)));
+    string CombineDownload(Download d) => string.Join(" ",
+        d.OriginalName, d.Beschreibung, d.Klasse, d.Gruppe);
+    string CombineProject(Project p) => string.Join(" ",
+        p.Name, p.Beschreibung, p.Projektleiter,
+        string.Join(" ", p.Journal.Select(j => j.Titel + " " + StripHtml(j.Content) + " " + j.CreatedBy)));
+    string CombinePendenz(Pendenz p) => string.Join(" ",
+        p.Text, p.Nummer, p.Verantwortlich);
+
+    bool AllowGruppe(string? gruppe)
+    {
+        if (isAdmin) return true;
+        if (string.IsNullOrEmpty(gruppe)) return true;
+        if (!allowedGruppen.Any()) return true;   // kein Recipient konfiguriert → alles zeigen
+        return allowedGruppen.Contains(gruppe, StringComparer.OrdinalIgnoreCase);
+    }
+
+    bool AllowProject(Project p) => isAdmin || ProjectSvc.CanRead(p, isAdmin, userRoles);
+
+    // ── Suchergebnisse ───────────────────────────────────────────────────────
+    var todoResults    = new List<TodoItem>();
+    var meetingResults = new List<Meeting>();
+    var downloadResults = new List<Download>();
+    var projectResults = new List<(Project p, string where)>();
+    var pendenzResults = new List<Pendenz>();
+
+    var searched = q.Length >= 2;
+
+    if (searched)
+    {
+        // Todos
+        var todos = await TodoSvc.GetAllAsync();
+        todoResults = todos.Where(t =>
+            AllowGruppe(t.Gruppe) && Matches(CombineTodo(t))
+        ).OrderBy(t => t.ErledigenBis).ToList();
+
+        // Meetings
+        var meetings = await MeetingSvc.GetAllAsync();
+        meetingResults = meetings.Where(m =>
+            AllowGruppe(m.Gruppe) && Matches(CombineMeeting(m))
+        ).OrderByDescending(m => m.Datum).ToList();
+
+        // Downloads
+        var downloads = await DownloadSvc.GetAllAsync();
+        downloadResults = downloads.Where(d =>
+            Matches(CombineDownload(d))
+        ).ToList();
+
+        // Projekte + Journal
+        var projects = await ProjectSvc.GetAllAsync();
+        foreach (var p in projects.Where(AllowProject))
+        {
+            if (!Matches(CombineProject(p))) continue;
+            var where = new List<string>();
+            if (Matches(string.Join(" ", p.Name, p.Beschreibung, p.Projektleiter)))
+                where.Add("Projektinfo");
+            var journalHits = p.Journal.Count(j =>
+                Matches(j.Titel + " " + StripHtml(j.Content) + " " + j.CreatedBy));
+            if (journalHits > 0) where.Add($"{journalHits} Journal-Eintr.");
+            projectResults.Add((p, where.Any() ? string.Join(", ", where) : "Treffer"));
+        }
+
+        // Eigene Pendenzen (Verantwortlich = Username, identisch zu _wPendenzen)
+        var pendenzen = await PendenzSvc.GetPersonalAsync(userName);
+        pendenzResults = pendenzen.Where(p =>
+            Matches(CombinePendenz(p))
+        ).ToList();
+    }
+
+    var totalHits = todoResults.Count + meetingResults.Count + downloadResults.Count +
+                    projectResults.Count + pendenzResults.Count;
+}
+
+@* ── Suchfeld ──────────────────────────────────────────────────────────── *@
+<div class="cms-search-box mb-4">
+    <form method="get" class="d-flex gap-2">
+        <input type="hidden" name="Id" value="@pageId" />
+        <input type="search" name="q" value="@q"
+               class="form-control form-control-lg"
+               placeholder="Suchen in Aufgaben, Meetings, Downloads, Projekten, Pendenzen …"
+               autofocus autocomplete="off" />
+        <button type="submit" class="btn btn-cms btn-lg px-4">
+            <i class="bi bi-search"></i>
+        </button>
+    </form>
+</div>
+
+@* ── Statuszeile ───────────────────────────────────────────────────────── *@
+@if (searched)
+{
+    <div class="mb-3 text-muted small">
+        @if (totalHits == 0)
+        {
+            <span><i class="bi bi-info-circle me-1"></i>Keine Treffer für <strong>«@q»</strong>.</span>
+        }
+        else
+        {
+            <span><strong>@totalHits</strong> Treffer für <strong>«@q»</strong></span>
+        }
+    </div>
+}
+else if (!string.IsNullOrEmpty(q))
+{
+    <div class="text-muted small mb-3"><i class="bi bi-info-circle me-1"></i>Mindestens 2 Zeichen eingeben.</div>
+}
+
+@* ── Aufgaben ──────────────────────────────────────────────────────────── *@
+@if (todoResults.Any())
+{
+    <div class="cms-search-section mb-4">
+        <h6 class="cms-search-section-title">
+            <i class="bi bi-check2-square me-1"></i>Aufgaben
+            <span class="badge bg-secondary ms-1">@todoResults.Count</span>
+        </h6>
+        <div class="list-group list-group-flush">
+            @foreach (var t in todoResults)
+            {
+                var diff     = (t.ErledigenBis - DateTime.Today).Days;
+                var rowColor = t.Erledigt ? "success" : (diff < 0 ? "danger" : (diff <= 7 ? "warning" : ""));
+                var badge    = t.Erledigt
+                    ? "<span class='badge bg-success'>Erledigt</span>"
+                    : (diff < 0 ? "<span class='badge bg-danger'>Überfällig</span>"
+                                : (diff <= 7 ? "<span class='badge bg-warning text-dark'>Bald fällig</span>"
+                                             : "<span class='badge bg-light text-dark border'>Offen</span>"));
+                <a href="/Todos/Detail?id=@t.Id&returnPageId=@pageId"
+                   class="list-group-item list-group-item-action list-group-item-@rowColor py-2">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <span class="text-muted small me-1">#@t.TaskNr</span>
+                            <strong>@t.Thema</strong>
+                            @Html.Raw(badge)
+                            @if (!string.IsNullOrEmpty(t.Klasse))
+                            { <span class="badge bg-light text-dark border ms-1">@t.Klasse</span> }
+                            @if (t.Files.Any(f => f.OriginalName.Contains(q, StringComparison.OrdinalIgnoreCase)))
+                            { <span class="badge bg-light text-muted border ms-1"><i class="bi bi-paperclip"></i> Datei</span> }
+                        </div>
+                        <small class="text-nowrap ms-2 text-muted">@t.ErledigenBis.ToString("dd.MM.yy")</small>
+                    </div>
+                    @if (!string.IsNullOrEmpty(t.Verantwortlich))
+                    { <div class="small text-muted mt-1"><i class="bi bi-person me-1"></i>@t.Verantwortlich</div> }
+                </a>
+            }
+        </div>
+    </div>
+}
+
+@* ── Meetings ──────────────────────────────────────────────────────────── *@
+@if (meetingResults.Any())
+{
+    <div class="cms-search-section mb-4">
+        <h6 class="cms-search-section-title">
+            <i class="bi bi-calendar-event me-1"></i>Meetings
+            <span class="badge bg-secondary ms-1">@meetingResults.Count</span>
+        </h6>
+        <div class="list-group list-group-flush">
+            @foreach (var m in meetingResults)
+            {
+                var isPast   = m.Datum < DateTime.Today;
+                var rowColor = isPast ? "success" : "";
+                <a href="/Meetings/Detail?id=@m.Id&returnPageId=@pageId"
+                   class="list-group-item list-group-item-action list-group-item-@rowColor py-2">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <span class="text-muted small me-1">#@m.MeetingNr</span>
+                            <strong>@m.Thema</strong>
+                            <span class="badge bg-light text-dark border ms-1">@m.Status</span>
+                            @if (!string.IsNullOrEmpty(m.Klasse))
+                            { <span class="badge bg-light text-dark border ms-1">@m.Klasse</span> }
+                            @if (m.Files.Any(f => f.OriginalName.Contains(q, StringComparison.OrdinalIgnoreCase)))
+                            { <span class="badge bg-light text-muted border ms-1"><i class="bi bi-paperclip"></i> Datei</span> }
+                        </div>
+                        <small class="text-nowrap ms-2 text-muted">@m.Datum.ToString("dd.MM.yy")</small>
+                    </div>
+                    @if (!string.IsNullOrEmpty(m.Leitung))
+                    { <div class="small text-muted mt-1"><i class="bi bi-person me-1"></i>@m.Leitung</div> }
+                </a>
+            }
+        </div>
+    </div>
+}
+
+@* ── Downloads ─────────────────────────────────────────────────────────── *@
+@if (downloadResults.Any())
+{
+    <div class="cms-search-section mb-4">
+        <h6 class="cms-search-section-title">
+            <i class="bi bi-download me-1"></i>Downloads
+            <span class="badge bg-secondary ms-1">@downloadResults.Count</span>
+        </h6>
+        <div class="list-group list-group-flush">
+            @foreach (var d in downloadResults)
+            {
+                <a href="/Downloads/File/@Uri.EscapeDataString(d.StoredName)/@Uri.EscapeDataString(d.OriginalName)"
+                   class="list-group-item list-group-item-action py-2" target="_blank">
+                    <div>
+                        <i class="bi bi-file-earmark me-1 text-muted"></i>
+                        <strong>@d.OriginalName</strong>
+                    </div>
+                    @if (!string.IsNullOrEmpty(d.Beschreibung))
+                    { <div class="small text-muted mt-1">@d.Beschreibung</div> }
+                </a>
+            }
+        </div>
+    </div>
+}
+
+@* ── Projekte ──────────────────────────────────────────────────────────── *@
+@if (projectResults.Any())
+{
+    <div class="cms-search-section mb-4">
+        <h6 class="cms-search-section-title">
+            <i class="bi bi-kanban me-1"></i>Projekte
+            <span class="badge bg-secondary ms-1">@projectResults.Count</span>
+        </h6>
+        <div class="list-group list-group-flush">
+            @foreach (var (p, where) in projectResults)
+            {
+                <a href="/Projects/Detail/@p.Id"
+                   class="list-group-item list-group-item-action py-2">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <strong>@p.Name</strong>
+                            <span class="badge bg-light text-dark border ms-1">@p.Status</span>
+                        </div>
+                        <small class="text-nowrap ms-2 text-muted">@where</small>
+                    </div>
+                    @if (!string.IsNullOrEmpty(p.Projektleiter))
+                    { <div class="small text-muted mt-1"><i class="bi bi-person me-1"></i>@p.Projektleiter</div> }
+                </a>
+            }
+        </div>
+    </div>
+}
+
+@* ── Eigene Pendenzen ──────────────────────────────────────────────────── *@
+@if (pendenzResults.Any())
+{
+    <div class="cms-search-section mb-4">
+        <h6 class="cms-search-section-title">
+            <i class="bi bi-list-check me-1"></i>Eigene Pendenzen
+            <span class="badge bg-secondary ms-1">@pendenzResults.Count</span>
+        </h6>
+        <div class="list-group list-group-flush">
+            @foreach (var p in pendenzResults)
+            {
+                var rowColor = p.Erledigt ? "success" : (p.ErledigenBis < DateTime.Today ? "danger" : "");
+                <a href="/Pendenzen/Detail?id=@p.Id"
+                   class="list-group-item list-group-item-action list-group-item-@rowColor py-2">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            @if (!string.IsNullOrEmpty(p.Nummer))
+                            { <span class="text-muted small me-1">@p.Nummer</span> }
+                            <span>@p.Text</span>
+                            @if (p.Erledigt)
+                            { <span class="badge bg-success ms-1">Erledigt</span> }
+                            else if (p.ErledigenBis < DateTime.Today)
+                            { <span class="badge bg-danger ms-1">Überfällig</span> }
+                        </div>
+                        @if (p.ErledigenBis.HasValue)
+                        { <small class="text-nowrap ms-2 text-muted">@p.ErledigenBis.Value.ToString("dd.MM.yy")</small> }
+                    </div>
+                </a>
+            }
+        </div>
+    </div>
+}
+
+<style>
+.cms-search-box input { font-size: 1rem; }
+.cms-search-section-title {
+    font-size: .8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--text-muted, #6c757d);
+    border-bottom: 1px solid var(--border-color, #dee2e6);
+    padding-bottom: .4rem;
+    margin-bottom: .5rem;
+}
+.cms-search-section .list-group-item {
+    border-left: none;
+    border-right: none;
+}
+.cms-search-section .list-group-item:first-child { border-top: none; }
+</style>

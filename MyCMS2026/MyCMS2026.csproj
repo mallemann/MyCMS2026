@@ -15,4 +15,8 @@
     <PackageReference Include="MimeKit" Version="4.16.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="App_Data\uploads\todos\" />
+  </ItemGroup>
+
 </Project>

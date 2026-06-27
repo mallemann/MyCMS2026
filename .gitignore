@@ -366,3 +366,6 @@ FodyWeavers.xsd
 # Alles in App_Data ignorieren, ausser dem Platzhalter .gitkeep
 MyCMS2026/App_Data/*
 !MyCMS2026/App_Data/.gitkeep
+
+# Produktions-Konfiguration mit Secrets (PccLink, etc.) — nie ins Repo
+MyCMS2026/appsettings.Production.json

@@ -102,19 +102,11 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label fw-semibold">Gruppe</label>
+                    <input type="hidden" asp-for="Meeting.Gruppe" />
+                    <input class="form-control" value="@(Model.Meeting.Gruppe ?? "")" readonly />
                     @if (!string.IsNullOrEmpty(Model.ProjectGruppe))
                     {
-                        @* Locked to project's Gruppe *@
-                        <input type="hidden" asp-for="Meeting.Gruppe" />
-                        <input class="form-control" value="@Model.ProjectGruppe" readonly />
                         <div class="form-text text-muted"><i class="bi bi-lock me-1"></i>Vom Projekt vorgegeben</div>
-                    }
-                    else
-                    {
-                        <input asp-for="Meeting.Gruppe" class="form-control" list="gruppenList" placeholder="– keine –" autocomplete="off" />
-                        <datalist id="gruppenList">
-                            @foreach (var g in alleGruppen) { <option value="@g" /> }
-                        </datalist>
                     }
                 </div>
                 <div class="col-md-6">
@@ -147,7 +139,7 @@
                             <li class="list-group-item d-flex justify-content-between align-items-center px-0">
                                 <span>
                                     <i class="bi bi-file-earmark me-1"></i>
-                                    <a asp-page="/Meetings/File" asp-route-id="@Model.Meeting.Id" asp-route-fileId="@f.Id">@f.OriginalName</a>
+                                    <a asp-page="/Meetings/File" asp-route-id="@Model.Meeting.Id" asp-route-fileId="@f.Id" asp-route-fileName="@f.OriginalName">@f.OriginalName</a>
                                     <span class="text-muted small ms-1">(@(f.Size / 1024) KB)</span>
                                 </span>
                                 <button type="button" class="btn btn-outline-danger btn-sm"

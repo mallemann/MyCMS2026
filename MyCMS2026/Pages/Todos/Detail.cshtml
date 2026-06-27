@@ -133,7 +133,7 @@ else
                         else icon = "bi-file-earmark";
                         <div class="file-item">
                             <i class="bi @icon fs-5"></i>
-                            <a asp-page="/Todos/File" asp-route-id="@t.Id" asp-route-fileId="@f.Id"
+                            <a asp-page="/Todos/File" asp-route-id="@t.Id" asp-route-fileId="@f.Id" asp-route-fileName="@f.OriginalName"
                                class="text-decoration-none flex-grow-1">@f.OriginalName</a>
                             <span class="text-muted small">@(f.Size / 1024) KB</span>
                         </div>

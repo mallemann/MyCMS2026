@@ -87,11 +87,11 @@ public class ProjectDetailModel : PageModel
 
     // ── Journal ──────────────────────────────────────────────────────────────
 
-    public async Task<IActionResult> OnPostAddJournalAsync(string id, string titel, string content)
+    public async Task<IActionResult> OnPostAddJournalAsync(string id, string titel, string content, DateTime? createdAt = null)
     {
         if (!await LoadProjectAsync(id)) return NotFound();
         if (!CanEdit) return Forbid();
-        await _projects.AddJournalEntryAsync(id, titel, content, User.Identity?.Name ?? "");
+        await _projects.AddJournalEntryAsync(id, titel, content, User.Identity?.Name ?? "", createdAt);
         return RedirectToPage(new { id, tab = "journal" });
     }
 
@@ -125,11 +125,11 @@ public class ProjectDetailModel : PageModel
         return RedirectToPage(new { id, tab = "journal", openEntry = entry?.Id });
     }
 
-    public async Task<IActionResult> OnPostUpdateJournalAsync(string id, string entryId, string titel, string content)
+    public async Task<IActionResult> OnPostUpdateJournalAsync(string id, string entryId, string titel, string content, DateTime? createdAt = null)
     {
         if (!await LoadProjectAsync(id)) return NotFound();
         if (!CanEdit) return Forbid();
-        await _projects.UpdateJournalEntryAsync(id, entryId, titel, content, User.Identity?.Name ?? "");
+        await _projects.UpdateJournalEntryAsync(id, entryId, titel, content, User.Identity?.Name ?? "", createdAt);
         return RedirectToPage(new { id, tab = "journal" });
     }
 

@@ -6,6 +6,7 @@ public class SiteConfig
     public string Status { get; set; } = "Active";   // "Active" | "Offline"
     public string FooterText { get; set; } = "";
     public string LogoUrl { get; set; } = "";
+    public string BaseUrl { get; set; } = "";   // z.B. https://mycms.example.com (für Links in Mails)
     public bool WeeklyMailEnabled { get; set; } = false;
     public SmtpSettings Smtp { get; set; } = new();
 }

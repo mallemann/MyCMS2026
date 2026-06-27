@@ -119,13 +119,13 @@
                         <td>@d.Beschreibung</td>
                         <td>
                             <i class="bi @icon me-1"></i>
-                            <a asp-page="/Downloads/File" asp-route-storedName="@d.StoredName" class="text-decoration-none">@d.OriginalName</a>
+                            <a asp-page="/Downloads/File" asp-route-storedName="@d.StoredName" asp-route-fileName="@d.OriginalName" class="text-decoration-none">@d.OriginalName</a>
                         </td>
                         <td><span class="badge bg-light text-dark border">@d.Klasse</span></td>
                         <td class="text-muted small">@d.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")</td>
                         <td class="text-muted small">@(d.Size / 1024) KB</td>
                         <td class="text-end">
-                            <a asp-page="/Downloads/File" asp-route-storedName="@d.StoredName"
+                            <a asp-page="/Downloads/File" asp-route-storedName="@d.StoredName" asp-route-fileName="@d.OriginalName"
                                class="btn btn-sm btn-outline-primary" title="Herunterladen">
                                 <i class="bi bi-download"></i>
                             </a>

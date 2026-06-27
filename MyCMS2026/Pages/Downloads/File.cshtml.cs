@@ -11,7 +11,7 @@ public class DownloadFileModel : PageModel
     private readonly DownloadService _downloads;
     public DownloadFileModel(DownloadService downloads) => _downloads = downloads;
 
-    public async Task<IActionResult> OnGetAsync(string storedName)
+    public async Task<IActionResult> OnGetAsync(string storedName, string? fileName = null)
     {
         if (string.IsNullOrEmpty(storedName)) return NotFound();
 
@@ -21,6 +21,8 @@ public class DownloadFileModel : PageModel
         var path = _downloads.GetFilePath(storedName);
         if (!System.IO.File.Exists(path)) return NotFound();
 
-        return PhysicalFile(path, _downloads.GetMimeType(storedName), item.OriginalName);
+        var ext = Path.GetExtension(storedName).ToLowerInvariant();
+        FileHelper.SetContentDisposition(Response, item.OriginalName, ext);
+        return PhysicalFile(path, _downloads.GetMimeType(storedName));
     }
 }

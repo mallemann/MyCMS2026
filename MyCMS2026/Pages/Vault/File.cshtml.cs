@@ -18,6 +18,8 @@ public class VaultFileModel : PageModel
         var path = _vault.GetFilePath(gruppe ?? "", fileName, subfolder ?? "");
         if (!System.IO.File.Exists(path)) return NotFound();
 
-        return PhysicalFile(path, _vault.GetMimeType(fileName), fileName);
+        var ext = Path.GetExtension(fileName).ToLowerInvariant();
+        FileHelper.SetContentDisposition(Response, fileName, ext);
+        return PhysicalFile(path, _vault.GetMimeType(fileName));
     }
 }

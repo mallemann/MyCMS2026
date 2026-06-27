@@ -11,7 +11,7 @@ public class TodoFileModel : PageModel
     private readonly TodoService _todos;
     public TodoFileModel(TodoService todos) => _todos = todos;
 
-    public async Task<IActionResult> OnGetAsync(string id, string fileId)
+    public async Task<IActionResult> OnGetAsync(string id, string fileId, string? fileName = null)
     {
         var todo = await _todos.GetByIdAsync(id);
         if (todo == null) return NotFound();
@@ -22,7 +22,7 @@ public class TodoFileModel : PageModel
         var path = _todos.GetFilePath(todo.TaskNr, file.StoredName);
         if (!System.IO.File.Exists(path)) return NotFound();
 
-        var ext = Path.GetExtension(file.StoredName).ToLowerInvariant();
+        var ext  = Path.GetExtension(file.StoredName).ToLowerInvariant();
         var mime = ext switch
         {
             ".pdf"  => "application/pdf",
@@ -36,6 +36,7 @@ public class TodoFileModel : PageModel
             _       => "application/octet-stream"
         };
 
-        return PhysicalFile(path, mime, file.OriginalName);
+        FileHelper.SetContentDisposition(Response, file.OriginalName, ext);
+        return PhysicalFile(path, mime);
     }
 }

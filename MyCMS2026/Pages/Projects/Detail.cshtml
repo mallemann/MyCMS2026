@@ -142,8 +142,14 @@
                         <div class="card-body">
                             <form method="post" asp-page-handler="AddJournal">
                                 <input type="hidden" name="id" value="@p.Id" />
-                                <div class="mb-2">
-                                    <input type="text" name="titel" class="form-control" placeholder="Titel..." required />
+                                <div class="row g-2 mb-2">
+                                    <div class="col-md-9">
+                                        <input type="text" name="titel" class="form-control" placeholder="Titel..." required />
+                                    </div>
+                                    <div class="col-md-3">
+                                        <input type="datetime-local" name="createdAt" class="form-control"
+                                               value="@DateTime.Today.ToString("yyyy-MM-dd")T12:00" />
+                                    </div>
                                 </div>
                                 <div class="mb-2">
                                     <textarea id="newJournalContent" name="content" class="form-control" rows="5"></textarea>
@@ -200,6 +206,17 @@
                                            title="Verknüpfte Aufgabe öffnen">
                                             <i class="bi bi-check2-square me-1"></i>Aufgabe @(lt?.TaskNr.ToString() ?? "")
                                         </a>
+                                        @if (lt != null)
+                                        {
+                                            <span class="badge @(lt.Erledigt ? "bg-success" : ((lt.ErledigenBis - DateTime.Today).Days < 0 ? "bg-danger" : "bg-warning text-dark")) me-1">
+                                                @(lt.Erledigt ? "Erledigt" : "Offen")
+                                            </span>
+                                            @if (!string.IsNullOrEmpty(lt.Verantwortlich))
+                                            {
+                                                <span class="small text-muted me-2"><i class="bi bi-person me-1"></i>@lt.Verantwortlich</span>
+                                            }
+                                            <span class="small text-muted"><i class="bi bi-calendar3 me-1"></i>bis @lt.ErledigenBis.ToString("dd.MM.yyyy")</span>
+                                        }
                                     }
                                     @if (!string.IsNullOrEmpty(entry.LinkedMeetingId))
                                     {
@@ -211,6 +228,16 @@
                                            title="Verknüpfte Sitzung öffnen">
                                             <i class="bi bi-calendar-event me-1"></i>Sitzung @(lm?.MeetingNr.ToString() ?? "")
                                         </a>
+                                        @if (lm != null)
+                                        {
+                                            var mStatusClass = lm.Status == "Abgeschlossen" ? "bg-success" : (lm.Status == "Abgesagt" ? "bg-secondary" : "bg-info text-dark");
+                                            <span class="badge @mStatusClass me-1">@lm.Status</span>
+                                            @if (!string.IsNullOrEmpty(lm.Leitung))
+                                            {
+                                                <span class="small text-muted me-2"><i class="bi bi-person me-1"></i>@lm.Leitung</span>
+                                            }
+                                            <span class="small text-muted"><i class="bi bi-calendar3 me-1"></i>@lm.Datum.ToString("dd.MM.yyyy")</span>
+                                        }
                                     }
                                     </div>
                                 }
@@ -268,8 +295,14 @@
                                 <form method="post" asp-page-handler="UpdateJournal">
                                     <input type="hidden" name="id" value="@p.Id" />
                                     <input type="hidden" name="entryId" value="@entry.Id" />
-                                    <div class="mb-2">
-                                        <input type="text" name="titel" value="@entry.Titel" class="form-control" required />
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-md-9">
+                                            <input type="text" name="titel" value="@entry.Titel" class="form-control" required />
+                                        </div>
+                                        <div class="col-md-3">
+                                            <input type="datetime-local" name="createdAt" class="form-control"
+                                                   value="@entry.CreatedAt.ToLocalTime().ToString("yyyy-MM-ddTHH:mm")" />
+                                        </div>
                                     </div>
                                     <div class="mb-2">
                                         <textarea id="editContent-@entry.Id" name="content" class="form-control" rows="5">@entry.Content</textarea>

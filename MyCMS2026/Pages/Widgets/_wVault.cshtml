@@ -3,7 +3,8 @@
 @using MyCMS2026.Models
 @inject VaultService VaultSvc
 @{
-    var isAdmin = User.IsInRole("Administrator");
+    var isAdmin  = User.IsInRole("Administrator");
+    var canEdit  = isAdmin || Model.HasExtendedAccess;
     var gruppe  = Model.NavItem?.ConfigString ?? "";
     var pageId  = Model.Id;
 
@@ -26,7 +27,7 @@
 }
 
 @* Upload-Modal *@
-@if (isAdmin)
+@if (canEdit)
 {
     <div class="modal fade" id="wVaultUploadModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
@@ -71,7 +72,7 @@
 
 <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
     <span class="text-muted small">@totalFiles Datei(en) in @folders.Count Ordner</span>
-    @if (isAdmin)
+    @if (canEdit)
     {
         <button class="btn btn-cms btn-sm" data-bs-toggle="modal" data-bs-target="#wVaultUploadModal">
             <i class="bi bi-upload me-1"></i>Hochladen

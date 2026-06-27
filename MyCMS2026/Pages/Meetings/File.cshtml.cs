@@ -11,7 +11,7 @@ public class MeetingFileModel : PageModel
     private readonly MeetingService _meetings;
     public MeetingFileModel(MeetingService meetings) => _meetings = meetings;
 
-    public async Task<IActionResult> OnGetAsync(string id, string fileId)
+    public async Task<IActionResult> OnGetAsync(string id, string fileId, string? fileName = null)
     {
         var meeting = await _meetings.GetByIdAsync(id);
         if (meeting == null) return NotFound();
@@ -22,6 +22,8 @@ public class MeetingFileModel : PageModel
         var path = _meetings.GetFilePath(meeting.MeetingNr, file.StoredName);
         if (!System.IO.File.Exists(path)) return NotFound();
 
-        return PhysicalFile(path, _meetings.GetMimeType(file.StoredName), file.OriginalName);
+        var ext = Path.GetExtension(file.StoredName).ToLowerInvariant();
+        FileHelper.SetContentDisposition(Response, file.OriginalName, ext);
+        return PhysicalFile(path, _meetings.GetMimeType(file.StoredName));
     }
 }

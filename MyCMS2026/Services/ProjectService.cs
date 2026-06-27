@@ -179,7 +179,7 @@ public class ProjectService
         return entry;
     }
 
-    public async Task<JournalEntry?> AddJournalEntryAsync(string projectId, string titel, string content, string createdBy)
+    public async Task<JournalEntry?> AddJournalEntryAsync(string projectId, string titel, string content, string createdBy, DateTime? createdAt = null)
     {
         var items = await LoadAsync();
         var project = items.FirstOrDefault(p => p.Id == projectId);
@@ -190,7 +190,7 @@ public class ProjectService
             Id        = Guid.NewGuid().ToString(),
             Titel     = titel,
             Content   = content,
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = createdAt.HasValue ? DateTime.SpecifyKind(createdAt.Value, DateTimeKind.Local).ToUniversalTime() : DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
             CreatedBy = createdBy,
             UpdatedBy = createdBy,
@@ -203,7 +203,7 @@ public class ProjectService
         return entry;
     }
 
-    public async Task<bool> UpdateJournalEntryAsync(string projectId, string entryId, string titel, string content, string updatedBy)
+    public async Task<bool> UpdateJournalEntryAsync(string projectId, string entryId, string titel, string content, string updatedBy, DateTime? createdAt = null)
     {
         var items = await LoadAsync();
         var project = items.FirstOrDefault(p => p.Id == projectId);
@@ -212,6 +212,8 @@ public class ProjectService
         if (entry == null) return false;
         entry.Titel     = titel;
         entry.Content   = content;
+        if (createdAt.HasValue)
+            entry.CreatedAt = DateTime.SpecifyKind(createdAt.Value, DateTimeKind.Local).ToUniversalTime();
         entry.UpdatedAt = DateTime.UtcNow;
         entry.UpdatedBy = updatedBy;
         project.UpdatedAt = DateTime.UtcNow;

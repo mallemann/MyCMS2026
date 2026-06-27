@@ -37,17 +37,22 @@ public class NavigationModel : PageModel
             .Select(u => u.UserName).OrderBy(u => u).ToList();
     }
 
-    private List<string> LoadWidgets()
-    {
-        var widgetsPath = System.IO.Path.Combine(
-            HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().ContentRootPath,
-            "Pages", "Widgets");
-        if (!System.IO.Directory.Exists(widgetsPath)) return new();
-        return System.IO.Directory.GetFiles(widgetsPath, "_w*.cshtml")
-            .Select(f => System.IO.Path.GetFileNameWithoutExtension(f).TrimStart('_'))
-            .OrderBy(w => w)
-            .ToList();
-    }
+    private static List<string> LoadWidgets() =>
+    [
+        "wDashboard",
+        "wDownloads",
+        "wHTMLPage",
+        "wHome",
+        "wMeetingTimeline",
+        "wMeetings",
+        "wOKR",
+        "wPccLink",
+        "wPendenzen",
+        "wProjects",
+        "wSearch",
+        "wToDo",
+        "wVault",
+    ];
 
     private NavItem BuildItem(string? id, string? parentId, string? title, string? navText,
         string? visRole, string? basicRole, string? extRole, string? widget, string? configStr, int menuOrder) => new()

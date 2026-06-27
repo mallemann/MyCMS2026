@@ -36,6 +36,7 @@ builder.Services.AddSingleton<GruppenService>();
 builder.Services.AddSingleton<VaultService>();
 builder.Services.AddSingleton<ProjectService>();
 builder.Services.AddSingleton<WeeklyMailService>();
+builder.Services.AddSingleton<PccLinkService>();
 builder.Services.AddHostedService<WeeklyMailBackgroundService>();
 
 var app = builder.Build();

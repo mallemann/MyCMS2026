@@ -15,6 +15,7 @@ public class WeeklyMailService
     private readonly ProjectService _projects;
     private readonly UserService _users;
     private readonly EmailService _email;
+    private readonly SiteService _site;
     private readonly ILogger<WeeklyMailService> _log;
 
     private static readonly JsonSerializerOptions _jsonOpts = new() { WriteIndented = true };
@@ -26,6 +27,7 @@ public class WeeklyMailService
         ProjectService projects,
         UserService users,
         EmailService email,
+        SiteService site,
         ILogger<WeeklyMailService> log)
     {
         var dataDir = Path.Combine(env.ContentRootPath, "App_Data");
@@ -36,6 +38,7 @@ public class WeeklyMailService
         _projects = projects;
         _users    = users;
         _email    = email;
+        _site     = site;
         _log      = log;
     }
 
@@ -95,6 +98,9 @@ public class WeeklyMailService
             return;
         }
 
+        var siteConfig  = await _site.GetAsync();
+        var baseUrl     = siteConfig.BaseUrl.TrimEnd('/');
+
         var allTodos    = await _todos.GetAllAsync();
         var allMeetings = await _meetings.GetAllAsync();
         var allProjects = await _projects.GetAllAsync();
@@ -112,7 +118,7 @@ public class WeeklyMailService
             try
             {
                 var html = BuildMail(recipient, userRoles, isAdmin,
-                    allTodos, allMeetings, allProjects, cutoff);
+                    allTodos, allMeetings, allProjects, cutoff, baseUrl);
 
                 await _email.SendAsync(recipient.Email,
                     $"Weekly Update – {DateTime.Today:dd.MM.yyyy}", html);
@@ -138,7 +144,8 @@ public class WeeklyMailService
         List<TodoItem> allTodos,
         List<Meeting> allMeetings,
         List<Project> allProjects,
-        DateTime cutoff)
+        DateTime cutoff,
+        string baseUrl)
     {
         var sb = new StringBuilder();
         sb.Append(@"<!DOCTYPE html>
@@ -155,6 +162,11 @@ public class WeeklyMailService
   .badge-open   { background: #fff3cd; color: #856404; }
   .badge-done   { background: #d1e7dd; color: #0a3622; }
   .badge-overdue{ background: #f8d7da; color: #842029; }
+  .row-done   { background-color: #d1e7dd; }
+  .row-overdue{ background-color: #f8d7da; }
+  .row-soon   { background-color: #fff3cd; }
+  a.link { color: #1a6bbf; text-decoration: none; }
+  a.link:hover { text-decoration: underline; }
   .empty { color: #999; font-size: 13px; font-style: italic; padding: 8px 0; }
   .footer { margin-top: 36px; font-size: 11px; color: #aaa; border-top: 1px solid #eee; padding-top: 12px; }
 </style>
@@ -181,13 +193,23 @@ public class WeeklyMailService
                 sb.Append("<table><thead><tr><th>#</th><th>Thema</th><th>Verantwortlich</th><th>Fällig</th><th>Klasse / Gruppe</th></tr></thead><tbody>");
                 foreach (var t in todos)
                 {
-                    var overdue = t.ErledigenBis < DateTime.Today;
-                    var badge = overdue
+                    var diff    = (t.ErledigenBis - DateTime.Today).Days;
+                    var overdue = diff < 0;
+                    var soon    = !overdue && diff <= 7;
+
+                    var rowClass = overdue ? "row-overdue" : (soon ? "row-soon" : "");
+                    var badge    = overdue
                         ? "<span class='badge badge-overdue'>Überfällig</span>"
-                        : "<span class='badge badge-open'>Offen</span>";
-                    var due = t.ErledigenBis.ToString("dd.MM.yyyy");
+                        : (soon ? "<span class='badge badge-open'>Bald fällig</span>" : "");
+
+                    var due          = t.ErledigenBis.ToString("dd.MM.yyyy");
                     var klasseGruppe = string.Join(" / ", new[] { t.Klasse, t.Gruppe }.Where(s => !string.IsNullOrEmpty(s)));
-                    sb.Append($"<tr><td>#{t.TaskNr}</td><td>{Esc(t.Thema)} {badge}</td><td>{Esc(t.Verantwortlich)}</td><td>{due}</td><td>{Esc(klasseGruppe)}</td></tr>");
+                    var thema        = Esc(t.Thema);
+
+                    if (!string.IsNullOrEmpty(baseUrl))
+                        thema = $"<a class='link' href='{baseUrl}/Todos/Detail?id={t.Id}'>{thema}</a>";
+
+                    sb.Append($"<tr class='{rowClass}'><td>#{t.TaskNr}</td><td>{thema} {badge}</td><td>{Esc(t.Verantwortlich)}</td><td>{due}</td><td>{Esc(klasseGruppe)}</td></tr>");
                 }
                 sb.Append("</tbody></table>");
             }
@@ -211,9 +233,16 @@ public class WeeklyMailService
                 sb.Append("<table><thead><tr><th>#</th><th>Thema</th><th>Leitung</th><th>Datum</th><th>Status</th><th>Klasse / Gruppe</th></tr></thead><tbody>");
                 foreach (var m in meetings)
                 {
-                    var datum = m.Datum.ToString("dd.MM.yyyy");
+                    var isPast       = m.Datum < DateTime.Today;
+                    var rowClass     = isPast ? "row-done" : "";
+                    var datum        = m.Datum.ToString("dd.MM.yyyy");
                     var klasseGruppe = string.Join(" / ", new[] { m.Klasse, m.Gruppe }.Where(s => !string.IsNullOrEmpty(s)));
-                    sb.Append($"<tr><td>#{m.MeetingNr}</td><td>{Esc(m.Thema)}</td><td>{Esc(m.Leitung)}</td><td>{datum}</td><td>{Esc(m.Status)}</td><td>{Esc(klasseGruppe)}</td></tr>");
+                    var thema        = Esc(m.Thema);
+
+                    if (!string.IsNullOrEmpty(baseUrl))
+                        thema = $"<a class='link' href='{baseUrl}/Meetings/Detail?id={m.Id}'>{thema}</a>";
+
+                    sb.Append($"<tr class='{rowClass}'><td>#{m.MeetingNr}</td><td>{thema}</td><td>{Esc(m.Leitung)}</td><td>{datum}</td><td>{Esc(m.Status)}</td><td>{Esc(klasseGruppe)}</td></tr>");
                 }
                 sb.Append("</tbody></table>");
             }
@@ -240,8 +269,12 @@ public class WeeklyMailService
             {
                 foreach (var (project, entry) in journalItems)
                 {
+                    var projectName = Esc(project.Name);
+                    if (!string.IsNullOrEmpty(baseUrl))
+                        projectName = $"<a class='link' href='{baseUrl}/Projects/Detail/{project.Id}'>{projectName}</a>";
+
                     sb.Append($"<div style='margin-bottom:16px;border-left:3px solid #4a90d9;padding-left:12px;'>");
-                    sb.Append($"<strong>{Esc(project.Name)}</strong> &mdash; {Esc(entry.Titel)}");
+                    sb.Append($"<strong>{projectName}</strong> &mdash; {Esc(entry.Titel)}");
                     sb.Append($"<div style='font-size:11px;color:#888;margin:2px 0 6px'>{entry.CreatedAt:dd.MM.yyyy HH:mm} &middot; {Esc(entry.CreatedBy)}</div>");
                     sb.Append($"<div style='font-size:13px'>{entry.Content}</div>");
                     sb.Append("</div>");
@@ -262,16 +295,13 @@ public class WeeklyMailService
     {
         return all.Where(t =>
         {
-            // Mit Projekt: LeseRolle des Projekts prüfen
             if (!string.IsNullOrEmpty(t.ProjectId))
             {
                 var proj = projects.FirstOrDefault(p => p.Id == t.ProjectId);
                 return proj is not null && _projects.CanRead(proj, isAdmin, userRoles);
             }
-            // Ohne Projekt, ohne Gruppe: alle sehen es
             if (string.IsNullOrEmpty(t.Gruppe))
                 return true;
-            // Ohne Projekt, mit Gruppe: AllowedGruppen des Empfängers prüfen
             return recipient.AllowedGruppen.Contains(t.Gruppe, StringComparer.OrdinalIgnoreCase);
         }).ToList();
     }
