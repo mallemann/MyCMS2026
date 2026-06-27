@@ -99,7 +99,7 @@
 @* ── Offene Tasks + Geplante Meetings ─────────────────────── *@
 @if (offeneTodos.Any() || geplantteMeetings.Any())
 {
-    <div class="row mt-4 g-3">
+    <div class="row mt-2 g-3">
 
         @* Offene Tasks *@
         <div class="col-lg-6">
@@ -130,6 +130,13 @@
                                                class="text-decoration-none text-body">
                                                 @(t.Thema.Length > 50 ? t.Thema[..50] + "…" : t.Thema)
                                             </a>
+                                            @if (!string.IsNullOrEmpty(t.ProjectName))
+                                            {
+                                                <a href="@Url.Page("/Projects/Detail", new { id = t.ProjectId })"
+                                                   class="badge bg-light text-dark border ms-1 small text-decoration-none">
+                                                    <i class="bi bi-kanban me-1"></i>@t.ProjectName
+                                                </a>
+                                            }
                                             @if (!string.IsNullOrEmpty(t.Gruppe))
                                             {
                                                 <span class="badge bg-light text-dark border ms-1 small">@t.Gruppe</span>
@@ -182,6 +189,13 @@
                                                class="text-decoration-none text-body">
                                                 @(m.Thema.Length > 50 ? m.Thema[..50] + "…" : m.Thema)
                                             </a>
+                                            @if (!string.IsNullOrEmpty(m.ProjectName))
+                                            {
+                                                <a href="@Url.Page("/Projects/Detail", new { id = m.ProjectId })"
+                                                   class="badge bg-light text-dark border ms-1 small text-decoration-none">
+                                                    <i class="bi bi-kanban me-1"></i>@m.ProjectName
+                                                </a>
+                                            }
                                             @if (!string.IsNullOrEmpty(m.Gruppe))
                                             {
                                                 <span class="badge bg-light text-dark border ms-1 small">@m.Gruppe</span>

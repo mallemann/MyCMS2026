@@ -126,6 +126,13 @@
                                 <i class="bi bi-paperclip"></i> @t.Files.Count
                             </span>
                         }
+                        @if (!string.IsNullOrEmpty(t.ProjectName))
+                        {
+                            <a href="@Url.Page("/Projects/Detail", new { id = t.ProjectId })"
+                               class="badge bg-light text-dark border ms-1 text-decoration-none">
+                                <i class="bi bi-kanban me-1"></i>@t.ProjectName
+                            </a>
+                        }
                         @if (!string.IsNullOrEmpty(t.Beschreibung))
                         {
                             <br /><small class="text-muted">@(t.Beschreibung.Length > 60 ? t.Beschreibung[..60] + "…" : t.Beschreibung)</small>

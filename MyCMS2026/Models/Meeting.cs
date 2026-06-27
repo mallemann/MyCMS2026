@@ -14,6 +14,7 @@ public class Meeting
     public string ContentType { get; set; } = "Text";
     public string Content { get; set; } = "";
     public string? ProjectId { get; set; }
+    public string? ProjectName { get; set; }
     public List<MeetingFile> Files { get; set; } = new();
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public string CreatedBy { get; set; } = "";

@@ -13,6 +13,7 @@ public class TodoItem
     public string Gruppe { get; set; } = "";
     public string Beschreibung { get; set; } = "";
     public string? ProjectId { get; set; }
+    public string? ProjectName { get; set; }
     public List<TodoFile> Files { get; set; } = new();
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public string CreatedBy { get; set; } = "";

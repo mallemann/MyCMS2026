@@ -9,6 +9,7 @@ public class MeetingService
     private readonly string _uploadDir;
     private readonly SemaphoreSlim _lock = new(1, 1);
     private List<Meeting>? _cache;
+    private readonly ProjectService _projects;
 
     private static readonly JsonSerializerOptions _jsonOpts = new()
     {
@@ -16,8 +17,9 @@ public class MeetingService
         PropertyNameCaseInsensitive = true
     };
 
-    public MeetingService(IWebHostEnvironment env)
+    public MeetingService(IWebHostEnvironment env, ProjectService projects)
     {
+        _projects = projects;
         var dataDir = Path.Combine(env.ContentRootPath, "App_Data");
         Directory.CreateDirectory(dataDir);
         _dataFile = Path.Combine(dataDir, "meetings.json");
@@ -69,8 +71,22 @@ public class MeetingService
 
     // ── CRUD ────────────────────────────────────────────────────────────────
 
-    public async Task<List<Meeting>> GetAllAsync() =>
-        (await LoadAsync()).OrderByDescending(m => m.Datum).ToList();
+    public async Task<List<Meeting>> GetAllAsync()
+    {
+        var items = await LoadAsync();
+        // Backfill ProjectName für bestehende Einträge mit ProjectId
+        var needsFill = items.Where(m => !string.IsNullOrEmpty(m.ProjectId) && string.IsNullOrEmpty(m.ProjectName)).ToList();
+        if (needsFill.Any())
+        {
+            foreach (var m in needsFill)
+            {
+                var proj = await _projects.GetByIdAsync(m.ProjectId!);
+                m.ProjectName = proj?.Name;
+            }
+            await SaveAsync(items);
+        }
+        return items.OrderByDescending(m => m.Datum).ToList();
+    }
 
     public async Task<Meeting?> GetByIdAsync(string id) =>
         (await LoadAsync()).FirstOrDefault(m => m.Id == id);
@@ -78,6 +94,11 @@ public class MeetingService
     public async Task<Meeting> CreateAsync(Meeting meeting, List<IFormFile> files)
     {
         Normalize(meeting);
+        if (!string.IsNullOrEmpty(meeting.ProjectId))
+        {
+            var proj = await _projects.GetByIdAsync(meeting.ProjectId);
+            meeting.ProjectName = proj?.Name;
+        }
         var items = await LoadAsync();
         meeting.Id        = Guid.NewGuid().ToString();
         meeting.MeetingNr = items.Count == 0 ? 1 : items.Max(m => m.MeetingNr) + 1;
@@ -93,6 +114,12 @@ public class MeetingService
     public async Task<bool> UpdateAsync(Meeting updated, List<IFormFile> newFiles)
     {
         Normalize(updated);
+        if (!string.IsNullOrEmpty(updated.ProjectId))
+        {
+            var proj = await _projects.GetByIdAsync(updated.ProjectId);
+            updated.ProjectName = proj?.Name;
+        }
+        else updated.ProjectName = null;
         var items = await LoadAsync();
         var idx = items.FindIndex(m => m.Id == updated.Id);
         if (idx < 0) return false;

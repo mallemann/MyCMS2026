@@ -9,6 +9,7 @@ public class TodoService
     private readonly string _uploadDir;
     private readonly SemaphoreSlim _lock = new(1, 1);
     private List<TodoItem>? _cache;
+    private readonly ProjectService _projects;
 
     private static readonly JsonSerializerOptions _jsonOpts = new()
     {
@@ -16,8 +17,9 @@ public class TodoService
         PropertyNameCaseInsensitive = true
     };
 
-    public TodoService(IWebHostEnvironment env)
+    public TodoService(IWebHostEnvironment env, ProjectService projects)
     {
+        _projects = projects;
         var dataDir = Path.Combine(env.ContentRootPath, "App_Data");
         Directory.CreateDirectory(dataDir);
         _dataFile = Path.Combine(dataDir, "todos.json");
@@ -86,8 +88,22 @@ public class TodoService
 
     // ── CRUD ────────────────────────────────────────────────────────────────
 
-    public async Task<List<TodoItem>> GetAllAsync() =>
-        (await LoadAsync()).OrderBy(t => t.Erledigt).ThenBy(t => t.ErledigenBis).ToList();
+    public async Task<List<TodoItem>> GetAllAsync()
+    {
+        var items = await LoadAsync();
+        // Backfill ProjectName für bestehende Einträge mit ProjectId
+        var needsFill = items.Where(t => !string.IsNullOrEmpty(t.ProjectId) && string.IsNullOrEmpty(t.ProjectName)).ToList();
+        if (needsFill.Any())
+        {
+            foreach (var t in needsFill)
+            {
+                var proj = await _projects.GetByIdAsync(t.ProjectId!);
+                t.ProjectName = proj?.Name;
+            }
+            await SaveAsync(items);
+        }
+        return items.OrderBy(t => t.Erledigt).ThenBy(t => t.ErledigenBis).ToList();
+    }
 
     public async Task<TodoItem?> GetByIdAsync(string id) =>
         (await LoadAsync()).FirstOrDefault(t => t.Id == id);
@@ -98,6 +114,11 @@ public class TodoService
         item.Verantwortlich= item.Verantwortlich?? "";
         item.Klasse        = string.IsNullOrEmpty(item.Klasse) ? "Allgemein" : item.Klasse;
         item.Beschreibung  = item.Beschreibung  ?? "";
+        if (!string.IsNullOrEmpty(item.ProjectId))
+        {
+            var proj = await _projects.GetByIdAsync(item.ProjectId);
+            item.ProjectName = proj?.Name;
+        }
         var items = await LoadAsync();
         item.Id        = Guid.NewGuid().ToString();
         item.TaskNr    = items.Count == 0 ? 1 : items.Max(t => t.TaskNr) + 1;
@@ -117,6 +138,12 @@ public class TodoService
         updated.Verantwortlich= updated.Verantwortlich?? "";
         updated.Klasse        = updated.Klasse        ?? "";
         updated.Beschreibung  = updated.Beschreibung  ?? "";
+        if (!string.IsNullOrEmpty(updated.ProjectId))
+        {
+            var proj = await _projects.GetByIdAsync(updated.ProjectId);
+            updated.ProjectName = proj?.Name;
+        }
+        else updated.ProjectName = null;
         var items = await LoadAsync();
         var idx = items.FindIndex(t => t.Id == updated.Id);
         if (idx < 0) return false;
