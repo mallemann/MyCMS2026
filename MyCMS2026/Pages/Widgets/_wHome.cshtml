@@ -44,7 +44,60 @@
         .Where(m => m.Status == "Geplant")
         .OrderBy(m => m.Datum).ToList();
 
-    var timelineMeetings = meetings.OrderByDescending(m => m.Datum).ToList();
+    var timelineMeetings  = meetings.OrderByDescending(m => m.Datum).ToList();
+    var ueberfaellig      = offeneTodos.Count(t => t.ErledigenBis.Date < today);
+    var naechstesMeeting  = geplantteMeetings.FirstOrDefault(m => m.Datum.Date >= today);
+}
+
+@* ── KPI-Kacheln ─────────────────────────────────────────────── *@
+@if (offeneTodos.Any() || geplantteMeetings.Any())
+{
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100 text-center py-3 px-2">
+                <div class="text-cms mb-1"><i class="bi bi-check2-square fs-3"></i></div>
+                <div class="display-6 fw-bold lh-1">@offeneTodos.Count</div>
+                <div class="text-muted small mt-1">Offene Tasks</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100 text-center py-3 px-2 @(ueberfaellig > 0 ? "border-start border-4 border-danger" : "")">
+                <div class="@(ueberfaellig > 0 ? "text-danger" : "text-muted") mb-1"><i class="bi bi-exclamation-triangle fs-3"></i></div>
+                <div class="display-6 fw-bold lh-1 @(ueberfaellig > 0 ? "text-danger" : "text-muted")">@ueberfaellig</div>
+                <div class="text-muted small mt-1">Überfällig</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100 text-center py-3 px-2">
+                <div class="text-info mb-1"><i class="bi bi-calendar-event fs-3"></i></div>
+                <div class="display-6 fw-bold lh-1">@geplantteMeetings.Count</div>
+                <div class="text-muted small mt-1">Geplante Meetings</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            @if (naechstesMeeting != null)
+            {
+                var daysUntil = (naechstesMeeting.Datum.Date - today).Days;
+                <a asp-page="/Meetings/Detail" asp-route-id="@naechstesMeeting.Id"
+                   asp-route-returnPageId="@Model.NavItem?.Id"
+                   class="card border-0 shadow-sm h-100 text-center py-3 px-2 text-decoration-none d-block">
+                    <div class="text-success mb-1"><i class="bi bi-arrow-right-circle fs-3"></i></div>
+                    <div class="fw-bold lh-1 small">@naechstesMeeting.Datum.ToString("dd. MMM")</div>
+                    <div class="text-muted small mt-1 text-truncate px-1">@naechstesMeeting.Thema</div>
+                    <div class="small @(daysUntil == 0 ? "text-warning fw-bold" : "text-success")">
+                        @(daysUntil == 0 ? "Heute" : $"in {daysUntil} Tag{(daysUntil == 1 ? "" : "en")}")
+                    </div>
+                </a>
+            }
+            else
+            {
+                <div class="card border-0 shadow-sm h-100 text-center py-3 px-2">
+                    <div class="text-muted mb-1"><i class="bi bi-calendar-x fs-3"></i></div>
+                    <div class="text-muted small mt-1">Kein Meeting geplant</div>
+                </div>
+            }
+        </div>
+    </div>
 }
 
 <div class="row mt-2">
@@ -107,52 +160,52 @@
                 <i class="bi bi-check2-square me-2"></i>Offene Tasks
                 <span class="badge bg-secondary ms-1">@offeneTodos.Count</span>
             </h6>
-            <div class="card border-0 shadow-sm h-100">
+            <div class="card border-0 shadow-sm">
                 @if (!offeneTodos.Any())
                 {
                     <div class="card-body text-muted small">Keine offenen Tasks.</div>
                 }
                 else
                 {
-                    <div class="table-responsive">
-                        <table class="table table-sm table-hover mb-0 align-middle">
-                            <tbody>
-                                @foreach (var t in offeneTodos.Take(15))
-                                {
-                                    var diff = (t.ErledigenBis.Date - today).TotalDays;
-                                    var rowCls = diff < 0 ? "table-danger" : diff <= 7 ? "table-warning" : "";
-                                    <tr class="@rowCls">
-                                        <td style="width:85px" class="text-nowrap small text-muted">
-                                            @t.ErledigenBis.ToString("dd.MM.yyyy")
-                                        </td>
-                                        <td>
-                                            <a asp-page="/Todos/Detail" asp-route-id="@t.Id"
-                                               class="text-decoration-none text-body">
-                                                @(t.Thema.Length > 50 ? t.Thema[..50] + "…" : t.Thema)
+                    <div class="px-1">
+                        @foreach (var t in offeneTodos.Take(15))
+                        {
+                            var diff     = (t.ErledigenBis.Date - today).TotalDays;
+                            var stripe   = diff < 0 ? "#dc3545" : diff <= 7 ? "#ffc107" : "#dee2e6";
+                            var dateClr  = diff < 0 ? "text-danger" : diff <= 7 ? "text-warning" : "text-muted";
+                            <div class="d-flex align-items-center gap-2 py-2 border-bottom">
+                                <div style="width:4px;min-height:36px;border-radius:2px;background:@stripe;flex-shrink:0"></div>
+                                <div class="flex-grow-1 overflow-hidden">
+                                    <a asp-page="/Todos/Detail" asp-route-id="@t.Id"
+                                       asp-route-returnPageId="@Model.NavItem?.Id"
+                                       class="text-decoration-none text-body fw-semibold d-block text-truncate">
+                                        @t.Thema
+                                    </a>
+                                    <div class="mt-1">
+                                        @if (!string.IsNullOrEmpty(t.ProjectName))
+                                        {
+                                            <a href="@Url.Page("/Projects/Detail", new { id = t.ProjectId })"
+                                               class="badge bg-light text-dark border me-1 text-decoration-none small">
+                                                <i class="bi bi-kanban me-1"></i>@t.ProjectName
                                             </a>
-                                            @if (!string.IsNullOrEmpty(t.ProjectName))
-                                            {
-                                                <a href="@Url.Page("/Projects/Detail", new { id = t.ProjectId })"
-                                                   class="badge bg-light text-dark border ms-1 small text-decoration-none">
-                                                    <i class="bi bi-kanban me-1"></i>@t.ProjectName
-                                                </a>
-                                            }
-                                            @if (!string.IsNullOrEmpty(t.Gruppe))
-                                            {
-                                                <span class="badge bg-light text-dark border ms-1 small">@t.Gruppe</span>
-                                            }
-                                        </td>
-                                        <td style="width:110px" class="text-muted small text-nowrap text-end">
-                                            @t.Verantwortlich
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
+                                        }
+                                        @if (!string.IsNullOrEmpty(t.Gruppe))
+                                        {
+                                            <span class="badge bg-light text-dark border me-1 small">@t.Gruppe</span>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="text-end small text-nowrap flex-shrink-0">
+                                    <div class="text-muted">#@t.TaskNr</div>
+                                    <div class="@dateClr">@t.ErledigenBis.ToString("dd.MM.yy")</div>
+                                    <div class="text-muted">@t.Verantwortlich</div>
+                                </div>
+                            </div>
+                        }
                     </div>
                     @if (offeneTodos.Count > 15)
                     {
-                        <div class="card-footer text-muted small">+ @(offeneTodos.Count - 15) weitere</div>
+                        <div class="px-3 py-2 text-muted small">+ @(offeneTodos.Count - 15) weitere</div>
                     }
                 }
             </div>
@@ -164,54 +217,52 @@
                 <i class="bi bi-calendar-check me-2"></i>Geplante Meetings
                 <span class="badge bg-secondary ms-1">@geplantteMeetings.Count</span>
             </h6>
-            <div class="card border-0 shadow-sm h-100">
+            <div class="card border-0 shadow-sm">
                 @if (!geplantteMeetings.Any())
                 {
                     <div class="card-body text-muted small">Keine geplanten Meetings.</div>
                 }
                 else
                 {
-                    <div class="table-responsive">
-                        <table class="table table-sm table-hover mb-0 align-middle">
-                            <tbody>
-                                @foreach (var m in geplantteMeetings.Take(15))
-                                {
-                                    var isPast  = m.Datum.Date < today;
-                                    var isToday = m.Datum.Date == today;
-                                    var isSoon  = !isPast && (m.Datum.Date - today).TotalDays <= 7;
-                                    var mRowCls = isToday ? "table-warning" : isSoon ? "table-info" : "";
-                                    <tr class="@mRowCls">
-                                        <td style="width:85px" class="text-nowrap small text-muted">
-                                            @m.Datum.ToString("dd.MM.yyyy")
-                                        </td>
-                                        <td>
-                                            <a asp-page="/Meetings/Detail" asp-route-id="@m.Id"
-                                               class="text-decoration-none text-body">
-                                                @(m.Thema.Length > 50 ? m.Thema[..50] + "…" : m.Thema)
+                    <div class="px-1">
+                        @foreach (var m in geplantteMeetings.Take(15))
+                        {
+                            var daysTo   = (m.Datum.Date - today).TotalDays;
+                            var stripe   = daysTo == 0 ? "#ffc107" : daysTo <= 7 ? "#0dcaf0" : "#dee2e6";
+                            var dateClr  = daysTo == 0 ? "text-warning fw-bold" : daysTo <= 7 ? "text-info" : "text-muted";
+                            <div class="d-flex align-items-center gap-2 py-2 border-bottom">
+                                <div style="width:4px;min-height:36px;border-radius:2px;background:@stripe;flex-shrink:0"></div>
+                                <div class="flex-grow-1 overflow-hidden">
+                                    <a asp-page="/Meetings/Detail" asp-route-id="@m.Id"
+                                       asp-route-returnPageId="@Model.NavItem?.Id"
+                                       class="text-decoration-none text-body fw-semibold d-block text-truncate">
+                                        @m.Thema
+                                    </a>
+                                    <div class="mt-1">
+                                        @if (!string.IsNullOrEmpty(m.ProjectName))
+                                        {
+                                            <a href="@Url.Page("/Projects/Detail", new { id = m.ProjectId })"
+                                               class="badge bg-light text-dark border me-1 text-decoration-none small">
+                                                <i class="bi bi-kanban me-1"></i>@m.ProjectName
                                             </a>
-                                            @if (!string.IsNullOrEmpty(m.ProjectName))
-                                            {
-                                                <a href="@Url.Page("/Projects/Detail", new { id = m.ProjectId })"
-                                                   class="badge bg-light text-dark border ms-1 small text-decoration-none">
-                                                    <i class="bi bi-kanban me-1"></i>@m.ProjectName
-                                                </a>
-                                            }
-                                            @if (!string.IsNullOrEmpty(m.Gruppe))
-                                            {
-                                                <span class="badge bg-light text-dark border ms-1 small">@m.Gruppe</span>
-                                            }
-                                        </td>
-                                        <td style="width:110px" class="text-muted small text-nowrap text-end">
-                                            @m.Leitung
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
+                                        }
+                                        @if (!string.IsNullOrEmpty(m.Gruppe))
+                                        {
+                                            <span class="badge bg-light text-dark border me-1 small">@m.Gruppe</span>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="text-end small text-nowrap flex-shrink-0">
+                                    <div class="text-muted">#@m.MeetingNr</div>
+                                    <div class="@dateClr">@m.Datum.ToString("dd.MM.yy")</div>
+                                    <div class="text-muted">@m.Leitung</div>
+                                </div>
+                            </div>
+                        }
                     </div>
                     @if (geplantteMeetings.Count > 15)
                     {
-                        <div class="card-footer text-muted small">+ @(geplantteMeetings.Count - 15) weitere</div>
+                        <div class="px-3 py-2 text-muted small">+ @(geplantteMeetings.Count - 15) weitere</div>
                     }
                 }
             </div>

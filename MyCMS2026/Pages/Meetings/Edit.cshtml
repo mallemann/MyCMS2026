@@ -61,7 +61,7 @@
                     <label class="form-label fw-semibold">Leitung</label>
                     @if (Model.Kuerzel.Any())
                     {
-                        <input asp-for="Meeting.Leitung" class="form-control" list="kuerzel-list" />
+                        <input asp-for="Meeting.Leitung" class="form-control" list="kuerzel-list" required />
                         <datalist id="kuerzel-list">
                             @foreach (var k in Model.Kuerzel)
                             {
@@ -71,7 +71,7 @@
                     }
                     else
                     {
-                        <input asp-for="Meeting.Leitung" class="form-control" />
+                        <input asp-for="Meeting.Leitung" class="form-control" required />
                     }
                 </div>
                 <div class="col-md-4">
