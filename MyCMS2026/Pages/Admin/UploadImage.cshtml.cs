@@ -32,7 +32,7 @@ public class UploadImageModel : PageModel
         if (file.Length > 10 * 1024 * 1024)
             return BadRequest(new { error = "Datei zu gross (max. 10 MB)." });
 
-        var uploadDir = Path.Combine(_env.WebRootPath, "uploads");
+        var uploadDir = Path.Combine(_env.ContentRootPath, "App_Data", "uploads", "images");
         Directory.CreateDirectory(uploadDir);
 
         // Eindeutiger Dateiname: Datum + GUID-Kürzel + Original-Endung
@@ -43,6 +43,7 @@ public class UploadImageModel : PageModel
         await using var stream = System.IO.File.Create(filePath);
         await file.CopyToAsync(stream);
 
-        return new JsonResult(new { url = $"/uploads/{safeName}" });
+        var pathBase = HttpContext.Request.PathBase.Value?.TrimEnd('/') ?? "";
+        return new JsonResult(new { url = $"{pathBase}/img/{safeName}" });
     }
 }

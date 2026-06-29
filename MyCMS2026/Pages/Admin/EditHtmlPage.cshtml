@@ -89,7 +89,7 @@
             var data = new FormData();
             data.append('file', file);
             $.ajax({
-                url:         '/Admin/UploadImage',
+                url:         '@Url.Page("/Admin/UploadImage")',
                 type:        'POST',
                 data:        data,
                 processData: false,

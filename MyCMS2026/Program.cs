@@ -73,6 +73,7 @@ app.Use(async (ctx, next) =>
     if (!path.StartsWith("/Account", StringComparison.OrdinalIgnoreCase) &&
         !path.StartsWith("/css",     StringComparison.OrdinalIgnoreCase) &&
         !path.StartsWith("/js",      StringComparison.OrdinalIgnoreCase) &&
+        !path.StartsWith("/img",     StringComparison.OrdinalIgnoreCase) &&
         !path.StartsWith("/_",       StringComparison.OrdinalIgnoreCase))
     {
         var siteSvc = ctx.RequestServices.GetRequiredService<SiteService>();
@@ -111,5 +112,31 @@ app.Use(async (ctx, next) =>
 
 app.UseAuthorization();
 app.MapRazorPages();
+
+// Bilder aus App_Data/uploads/images/ ausliefern (persistent über Deploys)
+app.MapGet("/img/{fileName}", (string fileName, IWebHostEnvironment env) =>
+{
+    // Sicherheit: nur erlaubte Zeichen im Dateinamen
+    if (!System.Text.RegularExpressions.Regex.IsMatch(fileName, @"^[\w\-\.]+$"))
+        return Results.NotFound();
+
+    var ext = Path.GetExtension(fileName).ToLowerInvariant();
+    var contentType = ext switch
+    {
+        ".jpg" or ".jpeg" => "image/jpeg",
+        ".png"            => "image/png",
+        ".gif"            => "image/gif",
+        ".webp"           => "image/webp",
+        ".svg"            => "image/svg+xml",
+        _                 => null
+    };
+    if (contentType is null) return Results.NotFound();
+
+    var filePath = Path.Combine(env.ContentRootPath, "App_Data", "uploads", "images", fileName);
+    return File.Exists(filePath)
+        ? Results.File(filePath, contentType)
+        : Results.NotFound();
+}).RequireAuthorization();
+
 
 app.Run();
