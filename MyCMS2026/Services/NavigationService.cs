@@ -29,13 +29,9 @@ public class NavigationService
                          VisibilityRole = "Public", BasicAccessRole = "Public",
                          ExtendedAccessRole = "Administrator", Widget = "wHome",
                          ConfigString = "", MenuOrder = 1 },
-                new() { Id = "2", ParentId = null, Title = "HTML Seite", NavigationText = "Info",
-                         VisibilityRole = "Member", BasicAccessRole = "Member",
-                         ExtendedAccessRole = "Administrator", Widget = "wHTMLPage",
-                         ConfigString = "", MenuOrder = 2 },
                 new() { Id = "3", ParentId = null, Title = "Administration", NavigationText = "Admin",
                          VisibilityRole = "Administrator", BasicAccessRole = "Administrator",
-                         ExtendedAccessRole = "Administrator", Widget = "",
+                         ExtendedAccessRole = "Administrator", Widget = "wAdmin",
                          ConfigString = "", MenuOrder = 99 }
             };
             var json = JsonSerializer.Serialize(defaults, new JsonSerializerOptions { WriteIndented = true });

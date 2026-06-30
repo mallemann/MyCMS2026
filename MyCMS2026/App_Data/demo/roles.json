@@ -1,0 +1,14 @@
+[
+  {
+    "Id": "462a388b-2c94-4c04-8296-6b404ea0e3d3",
+    "Name": "Administrator",
+    "Description": "Systemadministrator \u2013 darf Benutzer, Navigation und Site-Konfiguration verwalten.",
+    "SortOrder": 99
+  },
+  {
+    "Id": "465ea37a-8796-4bd0-8827-3574c374f85f",
+    "Name": "Member",
+    "Description": "Alle User",
+    "SortOrder": 10
+  }
+]

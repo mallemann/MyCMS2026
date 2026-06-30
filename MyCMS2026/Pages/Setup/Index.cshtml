@@ -1,0 +1,108 @@
+@page
+@model MyCMS2026.Pages.Setup.SetupIndexModel
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MyCMS – Ersteinrichtung</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="~/css/mycms.css" asp-append-version="true" />
+    <meta name="robots" content="noindex, nofollow" />
+</head>
+<body class="login-body">
+<div class="login-wrapper" style="max-width:520px;">
+
+    <div class="login-brand-icon">
+        <i class="bi bi-grid-3x3-gap-fill"></i>
+    </div>
+
+    <div class="card login-card">
+        <div class="card-body p-4">
+            <h5 class="text-center fw-bold mb-1">MyCMS Ersteinrichtung</h5>
+            <p class="text-center text-muted small mb-4">
+                Willkommen! Bitte richten Sie die Anwendung ein.
+            </p>
+
+            @if (!string.IsNullOrEmpty(Model.Error))
+            {
+                <div class="alert alert-danger py-2 small">
+                    <i class="bi bi-exclamation-circle me-1"></i>@Model.Error
+                </div>
+            }
+
+            <form method="post">
+
+                <h6 class="text-muted text-uppercase small border-bottom pb-1 mb-3">
+                    <i class="bi bi-globe me-1"></i>Site
+                </h6>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small">Site-Name <span class="text-danger">*</span></label>
+                    <input asp-for="SiteName" class="form-control" placeholder="z.B. Meine Organisation" required />
+                </div>
+                <div class="mb-4">
+                    <label class="form-label fw-semibold small">
+                        Base-URL
+                        <span class="text-muted fw-normal">(optional, für Links in E-Mails)</span>
+                    </label>
+                    <input asp-for="BaseUrl" class="form-control" placeholder="https://meine-domain.ch/mycms" autocomplete="off" />
+                </div>
+
+                <h6 class="text-muted text-uppercase small border-bottom pb-1 mb-3">
+                    <i class="bi bi-person-gear me-1"></i>Administrator
+                </h6>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small">Benutzername <span class="text-danger">*</span></label>
+                    <input asp-for="AdminUser" class="form-control" placeholder="admin" required autocomplete="username" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small">E-Mail <span class="text-danger">*</span></label>
+                    <input asp-for="AdminEmail" type="email" class="form-control" placeholder="admin@beispiel.ch" required />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small">Passwort <span class="text-danger">*</span></label>
+                    <input asp-for="AdminPw" type="password" class="form-control"
+                           placeholder="Min. 8 Zeichen" required autocomplete="new-password" />
+                </div>
+                <div class="mb-4">
+                    <label class="form-label fw-semibold small">Passwort bestätigen <span class="text-danger">*</span></label>
+                    <input asp-for="AdminPwConf" type="password" class="form-control"
+                           placeholder="Passwort wiederholen" required autocomplete="new-password" />
+                </div>
+
+                <h6 class="text-muted text-uppercase small border-bottom pb-1 mb-3">
+                    <i class="bi bi-database me-1"></i>Startdaten
+                </h6>
+
+                <div class="mb-4">
+                    <div class="form-check">
+                        <input asp-for="LoadDemoData" class="form-check-input" type="checkbox" />
+                        <label asp-for="LoadDemoData" class="form-check-label fw-semibold small">
+                            Demodaten laden
+                        </label>
+                    </div>
+                    <div class="text-muted small mt-1" style="padding-left:1.5rem;">
+                        Lädt Beispiel-Navigation und weitere Startdaten. Empfohlen für neue Installationen.
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-cms w-100 py-2">
+                    <i class="bi bi-check2-circle me-2"></i>Einrichtung abschliessen
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <p class="text-center mt-3 small" style="color:rgba(255,255,255,.5);">
+        MyCMS 2026
+    </p>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

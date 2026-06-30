@@ -53,6 +53,26 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+// Setup-Middleware: leitet auf /Setup um solange App_Data/setup-complete fehlt
+app.Use(async (ctx, next) =>
+{
+    var path      = ctx.Request.Path.Value ?? "";
+    var setupFlag = Path.Combine(
+        ctx.RequestServices.GetRequiredService<IWebHostEnvironment>().ContentRootPath,
+        "App_Data", "setup-complete");
+
+    if (!File.Exists(setupFlag) &&
+        !path.StartsWith("/Setup", StringComparison.OrdinalIgnoreCase) &&
+        !path.StartsWith("/css",   StringComparison.OrdinalIgnoreCase) &&
+        !path.StartsWith("/js",    StringComparison.OrdinalIgnoreCase) &&
+        !path.StartsWith("/_",     StringComparison.OrdinalIgnoreCase))
+    {
+        ctx.Response.Redirect(ctx.Request.PathBase + "/Setup");
+        return;
+    }
+    await next();
+});
+
 // Suchmaschinen-Indexierung verbieten
 app.Use(async (ctx, next) =>
 {

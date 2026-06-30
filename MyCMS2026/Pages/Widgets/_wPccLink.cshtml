@@ -1,6 +1,8 @@
 @model MyCMS2026.Pages.Page.PageIndexModel
 @inject MyCMS2026.Services.PccLinkService PccLinkSvc
+@inject IConfiguration Config
 @{
+    if (!Config.GetValue<bool>("AlbatrosEnabled")) return;
     var link         = PccLinkSvc.BuildLink();
     var isConfigured = PccLinkSvc.IsConfigured;
     var userName     = User.Identity?.Name ?? "";

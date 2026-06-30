@@ -13,8 +13,9 @@ public class NavigationModel : PageModel
     private readonly RoleService _roles;
     private readonly GruppenService _gruppen;
     private readonly UserService _users;
-    public NavigationModel(NavigationService nav, RoleService roles, GruppenService gruppen, UserService users)
-    { _nav = nav; _roles = roles; _gruppen = gruppen; _users = users; }
+    private readonly IConfiguration _config;
+    public NavigationModel(NavigationService nav, RoleService roles, GruppenService gruppen, UserService users, IConfiguration config)
+    { _nav = nav; _roles = roles; _gruppen = gruppen; _users = users; _config = config; }
 
     public List<NavItem> Items { get; private set; } = new();
     public List<string> AvailableWidgets { get; private set; } = new();
@@ -29,7 +30,7 @@ public class NavigationModel : PageModel
     private async Task LoadPageDataAsync()
     {
         Items = await _nav.GetAllAsync();
-        AvailableWidgets = LoadWidgets();
+        AvailableWidgets = LoadWidgets(_config.GetValue<bool>("AlbatrosEnabled"));
         AvailableRoles = await _roles.GetNamesAsync();
         AvailableGruppen = await _gruppen.GetAllAsync();
         AvailableUsernames = (await _users.GetAllAsync())
@@ -37,22 +38,28 @@ public class NavigationModel : PageModel
             .Select(u => u.UserName).OrderBy(u => u).ToList();
     }
 
-    private static List<string> LoadWidgets() =>
-    [
-        "wDashboard",
-        "wDownloads",
-        "wHTMLPage",
-        "wHome",
-        "wMeetingTimeline",
-        "wMeetings",
-        "wOKR",
-        "wPccLink",
-        "wPendenzen",
-        "wProjects",
-        "wSearch",
-        "wToDo",
-        "wVault",
-    ];
+    private static List<string> LoadWidgets(bool albatrosEnabled)
+    {
+        var widgets = new List<string>
+        {
+            "wDashboard",
+            "wDownloads",
+            "wHTMLPage",
+            "wHome",
+            "wMeetingTimeline",
+            "wMeetings",
+            "wOKR",
+            "wPendenzen",
+            "wProjects",
+            "wSearch",
+            "wToDo",
+            "wVault",
+        };
+        if (albatrosEnabled)
+            widgets.Add("wPccLink");
+        widgets.Sort();
+        return widgets;
+    }
 
     private NavItem BuildItem(string? id, string? parentId, string? title, string? navText,
         string? visRole, string? basicRole, string? extRole, string? widget, string? configStr, int menuOrder) => new()

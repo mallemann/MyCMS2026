@@ -363,9 +363,11 @@ MigrationBackup/
 FodyWeavers.xsd
 
 # MyCMS App_Data — Laufzeitdaten und Credentials, nicht ins Repo
-# Alles in App_Data ignorieren, ausser dem Platzhalter .gitkeep
 MyCMS2026/App_Data/*
 !MyCMS2026/App_Data/.gitkeep
+!MyCMS2026/App_Data/demo/
+MyCMS2026/App_Data/demo/*
+!MyCMS2026/App_Data/demo/*.json
 
 # Produktions-Konfiguration mit Secrets (PccLink, etc.) — nie ins Repo
 MyCMS2026/appsettings.Production.json
