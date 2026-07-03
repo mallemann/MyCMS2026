@@ -1,7 +1,25 @@
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using MyCMS2026.Infrastructure;
 using MyCMS2026.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Rate-Limiting: schützt Login und Passwort-Reset vor Brute Force.
+// Max. 10 Requests pro Minute pro Client-IP auf Seiten mit Policy "auth".
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("auth", ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window      = TimeSpan.FromMinutes(1),
+                QueueLimit  = 0
+            }));
+});
 
 builder.Services.AddRazorPages(options =>
     options.Conventions.ConfigureFilter(
@@ -42,6 +60,11 @@ builder.Services.AddSingleton<WeeklyMailService>();
 builder.Services.AddSingleton<PccLinkService>();
 builder.Services.AddSingleton<ActivityService>();
 builder.Services.AddHostedService<WeeklyMailBackgroundService>();
+
+// HTML-Sanitizer: entschärft von Benutzern erfasste Rich-Text-Inhalte
+// (Meetings, Projekt-Journal) beim Rendern — Schutz vor Stored XSS.
+// Instanz ist thread-safe solange die Konfiguration nicht verändert wird.
+builder.Services.AddSingleton(new Ganss.Xss.HtmlSanitizer());
 
 var app = builder.Build();
 
@@ -86,6 +109,7 @@ app.Use(async (ctx, next) =>
 
 app.UseStaticFiles();
 app.UseRouting();
+app.UseRateLimiter();
 app.UseAuthentication();
 
 // Offline-Sperre: Nicht-Administratoren werden blockiert wenn Status = "Offline"
@@ -151,7 +175,7 @@ app.MapGet("/img/{fileName}", (string fileName, IWebHostEnvironment env) =>
         ".png"            => "image/png",
         ".gif"            => "image/gif",
         ".webp"           => "image/webp",
-        ".svg"            => "image/svg+xml",
+        // kein SVG: kann Skripte enthalten (XSS-Risiko)
         _                 => null
     };
     if (contentType is null) return Results.NotFound();

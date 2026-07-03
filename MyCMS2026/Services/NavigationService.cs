@@ -136,6 +136,29 @@ public class NavigationService
         return roles.Contains("Administrator") || roles.Contains(item.ExtendedAccessRole);
     }
 
+    /// <summary>
+    /// Prüft ob ein Benutzer Zugriff auf eine Vault-Gruppe hat.
+    /// Massgeblich sind die Nav-Einträge mit Widget "wVault": der Benutzer braucht
+    /// Lesezugriff (BasicAccessRole) auf einen Eintrag mit passendem ConfigString.
+    /// Mit requireExtended=true wird stattdessen ExtendedAccessRole geprüft (z.B. für Uploads).
+    /// Administratoren haben immer Zugriff.
+    /// </summary>
+    public async Task<bool> CanAccessVaultGruppeAsync(
+        string? gruppe, IEnumerable<string> userRoles, bool requireExtended = false)
+    {
+        var roles = userRoles.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (roles.Contains("Administrator")) return true;
+
+        var items = await LoadFlatAsync();
+        return items.Any(i =>
+            string.Equals(i.Widget, "wVault", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(i.ConfigString ?? "", gruppe ?? "", StringComparison.OrdinalIgnoreCase) &&
+            (requireExtended
+                ? roles.Contains(i.ExtendedAccessRole)
+                : i.BasicAccessRole.Equals("Public", StringComparison.OrdinalIgnoreCase)
+                  || roles.Contains(i.BasicAccessRole)));
+    }
+
     // ── CRUD ──────────────────────────────────────────────────────────────────
 
     public async Task<bool> CreateAsync(NavItem item)

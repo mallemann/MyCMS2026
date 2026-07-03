@@ -10,23 +10,35 @@ namespace MyCMS2026.Pages.Vault;
 public class VaultIndexModel : PageModel
 {
     private readonly VaultService _vault;
-    public VaultIndexModel(VaultService vault) => _vault = vault;
+    private readonly NavigationService _nav;
+
+    public VaultIndexModel(VaultService vault, NavigationService nav)
+    {
+        _vault = vault;
+        _nav   = nav;
+    }
 
     public List<VaultFolder> Folders { get; private set; } = new();
     public string? Gruppe  { get; private set; }
     public string? Search  { get; private set; }
 
-    public async Task OnGetAsync(string? gruppe, string? search)
+    public async Task<IActionResult> OnGetAsync(string? gruppe, string? search)
     {
+        if (!await CanAccessAsync(gruppe)) return Forbid();
+
         Gruppe = gruppe;
         Search = search;
         await LoadAsync();
+        return Page();
     }
 
     // ── Datei hochladen ──────────────────────────────────────────────────
 
     public async Task<IActionResult> OnPostUploadAsync(IFormFile uploadFile, string? description, string? subfolder, string? gruppe)
     {
+        // Hochladen erfordert erweiterte Rechte auf der zugehörigen Vault-Seite
+        if (!await CanAccessAsync(gruppe, requireExtended: true)) return Forbid();
+
         if (uploadFile != null && uploadFile.Length > 0)
             await _vault.UploadAsync(gruppe ?? "", uploadFile, description ?? "", User.Identity?.Name ?? "", subfolder ?? "");
         return RedirectToPage(new { gruppe = NullIfEmpty(gruppe) });
@@ -78,6 +90,15 @@ public class VaultIndexModel : PageModel
     }
 
     // ── intern ───────────────────────────────────────────────────────────
+
+    /// <summary>Gruppenzugriff anhand der Nav-Berechtigungen (wVault-Einträge) prüfen.</summary>
+    private Task<bool> CanAccessAsync(string? gruppe, bool requireExtended = false)
+    {
+        var roles = User.Claims
+            .Where(c => c.Type == System.Security.Claims.ClaimTypes.Role)
+            .Select(c => c.Value);
+        return _nav.CanAccessVaultGruppeAsync(gruppe, roles, requireExtended);
+    }
 
     private async Task LoadAsync()
     {

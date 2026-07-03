@@ -19,13 +19,24 @@ public class EditHtmlPageModel : PageModel
     public bool IsError { get; set; }
     public bool FileNotFound { get; set; }
 
+    /// <summary>
+    /// Sicherheit: nur einfache Dateinamen mit Endung .html zulassen —
+    /// verhindert Path Traversal (../, absolute Pfade) aus App_Data/pages heraus.
+    /// </summary>
+    private static bool IsValidFileName(string fileName) =>
+        !string.IsNullOrEmpty(fileName)
+        && fileName == System.IO.Path.GetFileName(fileName)
+        && !fileName.Contains("..")
+        && fileName.EndsWith(".html", StringComparison.OrdinalIgnoreCase)
+        && System.Text.RegularExpressions.Regex.IsMatch(fileName, @"^[\w\-\.]+$");
+
     private string GetFilePath() =>
         System.IO.Path.Combine(_env.ContentRootPath, "App_Data", "pages", FileName);
 
     public IActionResult OnGet()
     {
-        if (string.IsNullOrEmpty(FileName))
-            return BadRequest("Kein Dateiname angegeben.");
+        if (!IsValidFileName(FileName))
+            return BadRequest("Ungültiger Dateiname.");
 
         var path = GetFilePath();
         if (System.IO.File.Exists(path))
@@ -41,16 +52,16 @@ public class EditHtmlPageModel : PageModel
         FileName = fileName;
         ReturnId = returnId;
 
-        if (string.IsNullOrEmpty(FileName))
+        if (!IsValidFileName(FileName))
         {
-            Message = "Kein Dateiname angegeben.";
+            Message = "Ungültiger Dateiname.";
             IsError = true;
             return Page();
         }
 
         var dir = System.IO.Path.Combine(_env.ContentRootPath, "App_Data", "pages");
         System.IO.Directory.CreateDirectory(dir);
-        var path = System.IO.Path.Combine(dir, FileName);
+        var path = GetFilePath();
 
         System.IO.File.WriteAllText(path, content ?? "");
         Content = content ?? "";

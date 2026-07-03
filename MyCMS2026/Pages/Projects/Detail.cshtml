@@ -2,6 +2,7 @@
 @model MyCMS2026.Pages.Projects.ProjectDetailModel
 @inject MyCMS2026.Services.TodoService TodoSvcView
 @inject MyCMS2026.Services.MeetingService MeetingSvcView
+@inject Ganss.Xss.HtmlSanitizer Sanitizer
 @{
     ViewData["Title"] = Model.Project.Name;
     var p   = Model.Project;
@@ -285,7 +286,8 @@
 
                         @* View mode *@
                         <div id="view-@entry.Id" class="card-body px-3 py-3">
-                            <div class="journal-content">@Html.Raw(entry.Content)</div>
+                            @* Sanitize: Member-Inhalte können Skripte enthalten (Stored XSS) *@
+                            <div class="journal-content">@Html.Raw(Sanitizer.Sanitize(entry.Content))</div>
                         </div>
 
                         @* Edit mode *@

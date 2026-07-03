@@ -1,5 +1,6 @@
 @page
 @model MyCMS2026.Pages.Meetings.MeetingDetailModel
+@inject Ganss.Xss.HtmlSanitizer Sanitizer
 @{
     ViewData["Title"] = Model.Meeting?.Thema ?? "Meeting";
     var m = Model.Meeting!;
@@ -110,7 +111,8 @@ else
         {
             <div class="card mb-4">
                 <div class="card-header-cms">Inhalt</div>
-                <div class="card-body">@Html.Raw(m.Content)</div>
+                @* Sanitize: Member-Inhalte können Skripte enthalten (Stored XSS) *@
+                <div class="card-body">@Html.Raw(Sanitizer.Sanitize(m.Content))</div>
             </div>
         }
 

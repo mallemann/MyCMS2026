@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kurze Wartung</title>
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #1a1a2e;
+    font-family: -apple-system, "Segoe UI", Arial, sans-serif;
+  }
+  .wrap {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .card {
+    background: #ffffff;
+    border-radius: 16px;
+    max-width: 420px;
+    width: 100%;
+    padding: 40px 32px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  }
+  .spinner {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 24px;
+    border-radius: 50%;
+    border: 4px solid #e6f1fb;
+    border-top-color: #4a90d9;
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  h1 {
+    font-size: 20px;
+    color: #1a1a2e;
+    margin: 0 0 8px;
+  }
+  p {
+    font-size: 14px;
+    color: #6b6b78;
+    line-height: 1.6;
+    margin: 0;
+  }
+  .bar {
+    height: 4px;
+    width: 100%;
+    background: #e6f1fb;
+    border-radius: 4px;
+    margin-top: 28px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    width: 40%;
+    background: #4a90d9;
+    border-radius: 4px;
+    animation: slide 1.4s ease-in-out infinite;
+  }
+  @keyframes slide {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(250%); }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="spinner"></div>
+      <h1>Kurze Wartung, gleich wieder online.</h1>
+      <p>Wir aktualisieren die Plattform. In kurzer Zeit ist alles wieder erreichbar.</p>
+      <div class="bar"><div class="bar-fill"></div></div>
+    </div>
+  </div>
+</body>
+</html>

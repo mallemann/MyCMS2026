@@ -51,7 +51,7 @@ public class ImagesModel : PageModel
         if (!Directory.Exists(UploadDir)) { Images = []; return; }
 
         var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg" };
+            { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
 
         // Alle HTML-Pages einlesen: Dateiname → Inhalt
         var pagesDir = Path.Combine(_env.ContentRootPath, "App_Data", "pages");

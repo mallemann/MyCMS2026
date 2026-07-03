@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.RateLimiting;
 using MyCMS2026.Services;
 
 namespace MyCMS2026.Pages.Account;
 
+[EnableRateLimiting("auth")]   // Schutz vor Brute Force und Mail-Bombing: max. 10 Requests/Minute pro IP
 public class ForgotPasswordModel : PageModel
 {
     private readonly UserService _users;
@@ -37,11 +39,22 @@ public class ForgotPasswordModel : PageModel
 
         if (token != null && email != null)
         {
-            var resetUrl = Url.Page(
-                "/Account/ResetPassword",
-                null,
-                new { token },
-                Request.Scheme)!;
+            // Sicherheit: Link aus der konfigurierten BaseUrl bauen statt aus dem
+            // Request-Host — verhindert Password-Reset-Poisoning via manipuliertem
+            // Host-Header. Fallback auf den Request nur wenn keine BaseUrl gesetzt ist.
+            string resetUrl;
+            if (!string.IsNullOrWhiteSpace(cfg.BaseUrl))
+            {
+                resetUrl = $"{cfg.BaseUrl.TrimEnd('/')}/Account/ResetPassword?token={Uri.EscapeDataString(token)}";
+            }
+            else
+            {
+                resetUrl = Url.Page(
+                    "/Account/ResetPassword",
+                    null,
+                    new { token },
+                    Request.Scheme)!;
+            }
 
             var body = $"""
                 <p>Hallo {userName},</p>

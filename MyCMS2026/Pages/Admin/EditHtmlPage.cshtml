@@ -91,6 +91,9 @@
             $.ajax({
                 url:         '@Url.Page("/Admin/UploadImage")',
                 type:        'POST',
+                // Antiforgery-Token aus dem Formular mitschicken (CSRF-Schutz)
+                headers:     { 'RequestVerificationToken':
+                                 document.querySelector('input[name="__RequestVerificationToken"]').value },
                 data:        data,
                 processData: false,
                 contentType: false,

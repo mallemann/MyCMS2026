@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.RateLimiting;
 using MyCMS2026.Services;
 
 namespace MyCMS2026.Pages.Account;
 
+[EnableRateLimiting("auth")]   // Brute-Force-Schutz: max. 10 Requests/Minute pro IP
 public class LoginModel : PageModel
 {
     private readonly UserService _users;

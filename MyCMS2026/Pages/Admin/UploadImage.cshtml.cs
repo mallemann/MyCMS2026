@@ -4,8 +4,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace MyCMS2026.Pages.Admin;
 
-[Authorize]
-[IgnoreAntiforgeryToken]   // AJAX-Upload; Zugriff via [Authorize] geschützt
+[Authorize(Roles = "Administrator")]
 public class UploadImageModel : PageModel
 {
     private readonly IWebHostEnvironment _env;
@@ -20,9 +19,9 @@ public class UploadImageModel : PageModel
         if (file is null || file.Length == 0)
             return BadRequest(new { error = "Keine Datei empfangen." });
 
-        // Erlaubte Bildformate
+        // Erlaubte Bildformate (kein SVG: kann Skripte enthalten → XSS-Risiko)
         var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg" };
+            { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
 
         var ext = Path.GetExtension(file.FileName);
         if (!allowed.Contains(ext))
