@@ -190,7 +190,7 @@ else if (!string.IsNullOrEmpty(q))
                     : (diff < 0 ? "<span class='badge bg-danger'>Überfällig</span>"
                                 : (diff <= 7 ? "<span class='badge bg-warning text-dark'>Bald fällig</span>"
                                              : "<span class='badge bg-light text-dark border'>Offen</span>"));
-                <a href="/Todos/Detail?id=@t.Id&returnPageId=@pageId"
+                <a href="@Url.Page("/Todos/Detail", new { id = t.Id, returnPageId = pageId })"
                    class="list-group-item list-group-item-action list-group-item-@rowColor py-2">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
@@ -225,7 +225,7 @@ else if (!string.IsNullOrEmpty(q))
             {
                 var isPast   = m.Datum < DateTime.Today;
                 var rowColor = isPast ? "success" : "";
-                <a href="/Meetings/Detail?id=@m.Id&returnPageId=@pageId"
+                <a href="@Url.Page("/Meetings/Detail", new { id = m.Id, returnPageId = pageId })"
                    class="list-group-item list-group-item-action list-group-item-@rowColor py-2">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
@@ -258,7 +258,7 @@ else if (!string.IsNullOrEmpty(q))
         <div class="list-group list-group-flush">
             @foreach (var d in downloadResults)
             {
-                <a href="/Downloads/File/@Uri.EscapeDataString(d.StoredName)/@Uri.EscapeDataString(d.OriginalName)"
+                <a href="@Url.Page("/Downloads/File", new { storedName = d.StoredName, originalName = d.OriginalName })"
                    class="list-group-item list-group-item-action py-2" target="_blank">
                     <div>
                         <i class="bi bi-file-earmark me-1 text-muted"></i>
@@ -283,7 +283,7 @@ else if (!string.IsNullOrEmpty(q))
         <div class="list-group list-group-flush">
             @foreach (var (p, where) in projectResults)
             {
-                <a href="/Projects/Detail/@p.Id"
+                <a href="@Url.Page("/Projects/Detail", new { id = p.Id })"
                    class="list-group-item list-group-item-action py-2">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
@@ -312,7 +312,7 @@ else if (!string.IsNullOrEmpty(q))
             @foreach (var p in pendenzResults)
             {
                 var rowColor = p.Erledigt ? "success" : (p.ErledigenBis < DateTime.Today ? "danger" : "");
-                <a href="/Pendenzen/Detail?id=@p.Id"
+                <a href="@Url.Page("/Pendenzen/Detail", new { id = p.Id })"
                    class="list-group-item list-group-item-action list-group-item-@rowColor py-2">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>

@@ -19,4 +19,18 @@
     <Folder Include="App_Data\uploads\todos\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Laufzeitdaten: nicht in Publish-Ordner kopieren (werden beim Setup erstellt) -->
+    <Content Update="App_Data\*.json">
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+    </Content>
+    <Content Update="App_Data\setup-complete">
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+    </Content>
+    <!-- Secrets: nie publizieren -->
+    <Content Update="appsettings.Production.json">
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>

@@ -15,9 +15,10 @@
         "wDashboard"       => "bi-graph-up",
         "wVault"     => "bi-safe",
         "wProjects"  => "bi-kanban",
-        "wSearch"    => "bi-search",
-        "wPccLink"   => "bi-box-arrow-up-right",
-        _            => "bi-circle"
+        "wSearch"        => "bi-search",
+        "wPccLink"       => "bi-box-arrow-up-right",
+        "wUserSettings"  => "bi-person-gear",
+        _                => "bi-circle"
     };
 
     static string Initials(string? name)
@@ -44,6 +45,8 @@
     var isAuthenticated = User.Identity?.IsAuthenticated == true;
     var userName        = User.Identity?.Name ?? "";
     var userRole        = userRoles.FirstOrDefault() ?? "";
+    var menuLayout      = Context.Request.Cookies["CmsMenuLayout"] ?? "vertical";
+    var menuHorizontal  = menuLayout == "horizontal";
 }
 <!DOCTYPE html>
 <html lang="de">
@@ -62,12 +65,138 @@
     <meta name="apple-mobile-web-app-title" content="MyCMS" />
     <meta name="theme-color" content="#1e2a3a" />
 </head>
-<body>
+<body class="@(isAuthenticated && menuHorizontal ? "cms-menu-horizontal" : "")">
 
 @if (isAuthenticated)
 {
     <div class="cms-layout">
 
+    @if (menuHorizontal)
+    {
+        @* ═══ TOPNAV (Horizontal-Modus) ═══ *@
+        <nav class="cms-topnav navbar navbar-expand-lg" id="cmsTopnav">
+            <div class="container-fluid">
+
+                @* Brand *@
+                <a class="cms-topnav-brand navbar-brand" asp-page="/Index">
+                    @if (!string.IsNullOrEmpty(site.LogoUrl))
+                    {
+                        <img src="@Url.Content(site.LogoUrl)" alt="@site.Title" class="cms-topnav-logo" />
+                    }
+                    else
+                    {
+                        <span class="cms-topnav-brand-icon"><i class="bi bi-grid-3x3-gap-fill"></i></span>
+                    }
+                    <span class="ms-2">@site.Title</span>
+                </a>
+
+                @* Mobile Toggle *@
+                <button class="navbar-toggler border-0 text-white" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#cmsTopnavMenu">
+                    <i class="bi bi-list fs-4"></i>
+                </button>
+
+                <div class="collapse navbar-collapse" id="cmsTopnavMenu">
+                    <ul class="navbar-nav me-auto">
+                        @foreach (var item in navTree)
+                        {
+                            @if (item.Children.Any())
+                            {
+                                var anyChildActive = item.Children.Any(c => c.Id == currentId);
+                                var parentActive   = item.Id == currentId || anyChildActive ? "active" : "";
+                                <li class="nav-item dropdown">
+                                    <a class="nav-link dropdown-toggle cms-topnav-link @parentActive"
+                                       href="#" role="button" data-bs-toggle="dropdown">
+                                        <i class="bi @NavIcon(item.Widget) me-1"></i>@item.NavigationText
+                                    </a>
+                                    <ul class="dropdown-menu cms-topnav-dropdown">
+                                        @if (!string.IsNullOrEmpty(item.Widget))
+                                        {
+                                            <li>
+                                                <a class="dropdown-item @(item.Id == currentId ? "active" : "")"
+                                                   asp-page="/Page/Index" asp-route-id="@item.Id">
+                                                    <i class="bi @NavIcon(item.Widget) me-1"></i>@item.NavigationText
+                                                </a>
+                                            </li>
+                                            <li><hr class="dropdown-divider" /></li>
+                                        }
+                                        @foreach (var child in item.Children)
+                                        {
+                                            <li>
+                                                <a class="dropdown-item @(child.Id == currentId ? "active" : "")"
+                                                   asp-page="/Page/Index" asp-route-id="@child.Id">
+                                                    <i class="bi @NavIcon(child.Widget) me-1"></i>@child.NavigationText
+                                                </a>
+                                            </li>
+                                        }
+                                    </ul>
+                                </li>
+                            }
+                            else
+                            {
+                                var active = item.Id == currentId ? "active" : "";
+                                <li class="nav-item">
+                                    <a class="nav-link cms-topnav-link @active"
+                                       asp-page="/Page/Index" asp-route-id="@item.Id">
+                                        <i class="bi @NavIcon(item.Widget) me-1"></i>@item.NavigationText
+                                    </a>
+                                </li>
+                            }
+                        }
+
+                        @* Admin-Links *@
+                        @if (User.IsInRole("Administrator"))
+                        {
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle cms-topnav-link @(currentPath.StartsWith("/admin") ? "active" : "")"
+                                   href="#" role="button" data-bs-toggle="dropdown">
+                                    <i class="bi bi-speedometer2 me-1"></i>Admin
+                                </a>
+                                <ul class="dropdown-menu cms-topnav-dropdown">
+                                    <li><a class="dropdown-item" asp-page="/Admin/Users"><i class="bi bi-people-fill me-1"></i>Benutzer</a></li>
+                                    <li><a class="dropdown-item" asp-page="/Admin/Navigation"><i class="bi bi-list-nested me-1"></i>Navigation</a></li>
+                                    <li><a class="dropdown-item" asp-page="/Admin/Roles"><i class="bi bi-shield-lock me-1"></i>Rollen</a></li>
+                                    <li><a class="dropdown-item" asp-page="/Admin/SiteConfig"><i class="bi bi-sliders me-1"></i>Site-Konfiguration</a></li>
+                                    <li><a class="dropdown-item" asp-page="/Admin/Klassen"><i class="bi bi-tags me-1"></i>Klassen</a></li>
+                                    <li><a class="dropdown-item" asp-page="/Admin/Gruppen"><i class="bi bi-collection me-1"></i>Gruppen</a></li>
+                                    <li><a class="dropdown-item" asp-page="/Admin/WeeklyMail"><i class="bi bi-envelope-paper me-1"></i>Reporting Settings</a></li>
+                                    <li><a class="dropdown-item" asp-page="/Admin/Activity"><i class="bi bi-activity me-1"></i>Aktivitätslog</a></li>
+                                </ul>
+                            </li>
+                        }
+                    </ul>
+
+                    @* User-Bereich rechts *@
+                    <ul class="navbar-nav ms-auto align-items-center gap-1">
+                        <li class="nav-item">
+                            <span class="nav-link cms-topnav-user text-nowrap">
+                                <span class="cms-topnav-avatar me-1">@Initials(userName)</span>
+                                <span class="d-none d-xl-inline">@userName</span>
+                                @if (!string.IsNullOrEmpty(userRole))
+                                {
+                                    <span class="badge bg-secondary ms-1 d-none d-xl-inline">@userRole</span>
+                                }
+                            </span>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link cms-topnav-link" asp-page="/Account/ChangePassword" title="Passwort ändern">
+                                <i class="bi bi-key"></i>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <form method="post" asp-page="/Account/Logout">
+                                <button type="submit" class="btn btn-sm btn-outline-light ms-1">
+                                    <i class="bi bi-box-arrow-right me-1"></i>Abmelden
+                                </button>
+                            </form>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    }
+    else
+    {
         @* ═══ SIDEBAR ═══ *@
         <aside class="cms-sidebar" id="cmsSidebar">
 
@@ -190,6 +319,11 @@
                         <i class="bi bi-envelope-paper cms-nav-icon"></i>
                         Reporting Settings
                     </a>
+                    <a class="cms-nav-item @(currentPath.StartsWith("/admin/activity") ? "active" : "")"
+                       asp-page="/Admin/Activity">
+                        <i class="bi bi-activity cms-nav-icon"></i>
+                        Aktivitätslog
+                    </a>
                 }
 
             </nav>
@@ -218,17 +352,21 @@
             </div>
 
         </aside>
+    }@* /else sidebar *@
 
         @* ═══ MAIN ═══ *@
         <div class="cms-main">
 
-            @* Mobile Topbar *@
+            @* Mobile Topbar (nur Sidebar-Modus) *@
+            @if (!menuHorizontal)
+            {
             <header class="cms-topbar">
                 <button class="cms-topbar-toggle" id="sidebarToggle" aria-label="Menü">
                     <i class="bi bi-list fs-4"></i>
                 </button>
                 <span class="cms-topbar-title">@ViewData["Title"]</span>
             </header>
+            }
 
             @* Page Content *@
             <main class="cms-content">

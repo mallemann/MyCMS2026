@@ -31,10 +31,11 @@ public class OkrIndexModel : PageModel
     }
 
     // Hilfsmethode: zurück zum Widget oder zur OKR-Seite
+    // Wichtig: RedirectToPage statt Redirect($"/...") — respektiert PathBase!
     private IActionResult RedirectBack(string? returnPageId, int? year)
     {
         if (!string.IsNullOrEmpty(returnPageId))
-            return Redirect($"/Page/Index?Id={returnPageId}&okrYear={year}");
+            return RedirectToPage("/Page/Index", new { Id = returnPageId, okrYear = year });
         return RedirectToPage(new { year });
     }
 

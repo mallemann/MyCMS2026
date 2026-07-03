@@ -1,8 +1,11 @@
+using MyCMS2026.Infrastructure;
 using MyCMS2026.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddRazorPages();
+builder.Services.AddRazorPages(options =>
+    options.Conventions.ConfigureFilter(
+        new Microsoft.AspNetCore.Mvc.TypeFilterAttribute(typeof(ActivityPageFilter))));
 builder.Services.ConfigureHttpJsonOptions(o =>
     o.SerializerOptions.PropertyNameCaseInsensitive = true);
 
@@ -37,6 +40,7 @@ builder.Services.AddSingleton<VaultService>();
 builder.Services.AddSingleton<ProjectService>();
 builder.Services.AddSingleton<WeeklyMailService>();
 builder.Services.AddSingleton<PccLinkService>();
+builder.Services.AddSingleton<ActivityService>();
 builder.Services.AddHostedService<WeeklyMailBackgroundService>();
 
 var app = builder.Build();

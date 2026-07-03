@@ -1,0 +1,101 @@
+@page
+@model MyCMS2026.Pages.Admin.ActivityModel
+@{
+    ViewData["Title"] = "Aktivitätslog";
+
+    // Gruppieren für Statistik-Überblick
+    var byUser = Model.Entries
+        .GroupBy(e => e.User)
+        .Select(g => new {
+            User       = g.Key,
+            Days       = g.Count(),
+            LastLogin  = g.Max(e => e.Date),
+            TotalPages = g.Sum(e => e.Pages.Count)
+        })
+        .OrderByDescending(x => x.LastLogin)
+        .ToList();
+}
+
+<div>
+    <div class="cms-page-header">
+        <h1 class="cms-page-title"><i class="bi bi-activity me-2 fs-4"></i>Aktivitätslog</h1>
+        <span class="badge bg-secondary">@Model.Entries.Count Einträge</span>
+    </div>
+    <div class="cms-page-body">
+
+    @if (!Model.Entries.Any())
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>Noch keine Aktivitäten aufgezeichnet.
+        </div>
+    }
+    else
+    {
+        @* ── Benutzer-Zusammenfassung ──────────────────────────────── *@
+        <h6 class="text-muted border-bottom pb-2 mb-3">
+            <i class="bi bi-people me-1"></i>Benutzer-Übersicht
+        </h6>
+        <div class="row g-3 mb-4">
+            @foreach (var u in byUser)
+            {
+                <div class="col-sm-6 col-lg-4">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body py-2 px-3">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <span class="cms-user-avatar" style="width:28px;height:28px;font-size:.7rem;background:var(--cms-accent);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;flex-shrink:0;">
+                                    @(u.User.Length >= 2 ? u.User[..2].ToUpper() : u.User.ToUpper())
+                                </span>
+                                <strong class="small">@u.User</strong>
+                            </div>
+                            <div class="d-flex gap-3 small text-muted">
+                                <span><i class="bi bi-calendar3 me-1"></i>@u.Days Tage</span>
+                                <span><i class="bi bi-file-earmark me-1"></i>@u.TotalPages Seiten</span>
+                                <span><i class="bi bi-clock me-1"></i>@DateTime.Parse(u.LastLogin).ToString("dd.MM.yy")</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        @* ── Detail-Log ────────────────────────────────────────────── *@
+        <h6 class="text-muted border-bottom pb-2 mb-3">
+            <i class="bi bi-list-ul me-1"></i>Detaillierter Log
+        </h6>
+        <div class="table-responsive">
+            <table class="table table-hover table-sm align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Benutzer</th>
+                        <th>Datum</th>
+                        <th>Anmeldung</th>
+                        <th>Besuchte Seiten</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var e in Model.Entries)
+                    {
+                        <tr>
+                            <td class="fw-semibold small">@e.User</td>
+                            <td class="text-nowrap small">@DateTime.Parse(e.Date).ToString("dd.MM.yyyy")</td>
+                            <td class="text-muted small text-nowrap">@e.FirstLogin Uhr</td>
+                            <td>
+                                @foreach (var pageName in e.Pages)
+                                {
+                                    <span class="badge bg-secondary me-1 mb-1">@pageName</span>
+                                }
+                                @if (!e.Pages.Any())
+                                {
+                                    <span class="text-muted small">nur angemeldet</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p class="text-muted small mt-2">@Model.Entries.Count Einträge total</p>
+    }
+
+    </div>@* /cms-page-body *@
+</div>

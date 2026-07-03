@@ -71,7 +71,7 @@ public class PendenzEditModel : PageModel
         {
             // Input.ConfigString kommt bereits aus dem Hidden-Field im Formular
             await _pendenzSvc.CreateAsync(Input, CurrentUser);
-            return Redirect($"/Page/Index?id={ReturnId}");
+            return RedirectToPage("/Page/Index", new { id = ReturnId });
         }
         else
         {
@@ -82,7 +82,7 @@ public class PendenzEditModel : PageModel
                 IsError = true;
                 return Page();
             }
-            return Redirect($"/Page/Index?id={ReturnId}");
+            return RedirectToPage("/Page/Index", new { id = ReturnId });
         }
     }
 
@@ -103,6 +103,6 @@ public class PendenzEditModel : PageModel
             return Page();
         }
 
-        return Redirect($"/Page/Index?id={ReturnId}");
+        return RedirectToPage("/Page/Index", new { id = ReturnId });
     }
 }

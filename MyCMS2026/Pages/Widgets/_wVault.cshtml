@@ -88,7 +88,7 @@
         <button type="submit" class="btn btn-cms btn-sm"><i class="bi bi-search"></i></button>
         @if (!string.IsNullOrEmpty(search))
         {
-            <a href="/Page/Index?Id=@pageId" class="btn btn-outline-secondary btn-sm">Reset</a>
+            <a asp-page="/Page/Index" asp-route-Id="@pageId" class="btn btn-outline-secondary btn-sm">Reset</a>
         }
         <a asp-page="/Vault/Index" asp-route-gruppe="@gruppe" class="btn btn-outline-secondary btn-sm ms-auto">
             <i class="bi bi-arrows-fullscreen me-1"></i>Vollansicht

@@ -1,0 +1,94 @@
+@model MyCMS2026.Pages.Page.PageIndexModel
+@{
+    var userName  = User.Identity?.Name ?? "";
+    var userRoles = User.Claims
+        .Where(c => c.Type == System.Security.Claims.ClaimTypes.Role)
+        .Select(c => c.Value)
+        .ToList();
+
+    // Cookie auslesen (serverseitig, damit JS-loses Rendering funktioniert)
+    var menuLayout = Context.Request.Cookies["CmsMenuLayout"] ?? "vertical";
+    var isHorizontal = menuLayout == "horizontal";
+}
+
+<div class="row g-4">
+
+    @* ── Benutzer-Info ─────────────────────────────────────── *@
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header card-header-cms">
+                <i class="bi bi-person-circle me-2"></i>Angemeldeter Benutzer
+            </div>
+            <ul class="list-group list-group-flush">
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span class="text-muted small">Benutzername</span>
+                    <span class="fw-semibold">@userName</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between align-items-start">
+                    <span class="text-muted small">Rollen</span>
+                    <div class="d-flex flex-wrap gap-1 justify-content-end">
+                        @foreach (var role in userRoles)
+                        {
+                            <span class="badge bg-secondary">@role</span>
+                        }
+                        @if (!userRoles.Any())
+                        {
+                            <span class="text-muted small">Keine Rolle</span>
+                        }
+                    </div>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    @* ── Menü-Layout ───────────────────────────────────────── *@
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header card-header-cms">
+                <i class="bi bi-layout-sidebar me-2"></i>Menü-Layout
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    Wähle, ob das Navigationsmenü links vertikal oder oben horizontal angezeigt wird.
+                    Die Einstellung wird in diesem Browser gespeichert.
+                </p>
+                <div class="d-flex gap-3 flex-wrap">
+
+                    <button type="button" id="btnMenuVertical"
+                            class="btn @(!isHorizontal ? "btn-cms" : "btn-outline-secondary") d-flex flex-column align-items-center gap-2 px-4 py-3"
+                            onclick="cmsSetMenuLayout('vertical')">
+                        <i class="bi bi-layout-sidebar fs-3"></i>
+                        <span class="small fw-semibold">Vertikal (links)</span>
+                        @if (!isHorizontal)
+                        {
+                            <span class="badge bg-light text-dark border">Aktiv</span>
+                        }
+                    </button>
+
+                    <button type="button" id="btnMenuHorizontal"
+                            class="btn @(isHorizontal ? "btn-cms" : "btn-outline-secondary") d-flex flex-column align-items-center gap-2 px-4 py-3"
+                            onclick="cmsSetMenuLayout('horizontal')">
+                        <i class="bi bi-layout-three-columns fs-3"></i>
+                        <span class="small fw-semibold">Horizontal (oben)</span>
+                        @if (isHorizontal)
+                        {
+                            <span class="badge bg-light text-dark border">Aktiv</span>
+                        }
+                    </button>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+function cmsSetMenuLayout(mode) {
+    // Cookie mit 1 Jahr Gültigkeit setzen (Path = root damit er überall gilt)
+    var expires = new Date();
+    expires.setFullYear(expires.getFullYear() + 1);
+    document.cookie = 'CmsMenuLayout=' + mode + '; path=/; expires=' + expires.toUTCString() + '; SameSite=Lax';
+    location.reload();
+}
+</script>

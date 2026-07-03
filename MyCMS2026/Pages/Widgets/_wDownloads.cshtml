@@ -130,7 +130,7 @@
         </div>
         <div class="col-auto">
             <button type="submit" class="btn btn-cms btn-sm"><i class="bi bi-funnel me-1"></i>Filter</button>
-            <a href="/Page/Index?Id=@pageId" class="btn btn-outline-secondary btn-sm ms-1">Reset</a>
+            <a asp-page="/Page/Index" asp-route-Id="@pageId" class="btn btn-outline-secondary btn-sm ms-1">Reset</a>
         </div>
     </form>
 </div>

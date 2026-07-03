@@ -53,6 +53,7 @@ public class NavigationModel : PageModel
             "wProjects",
             "wSearch",
             "wToDo",
+            "wUserSettings",
             "wVault",
         };
         if (albatrosEnabled)

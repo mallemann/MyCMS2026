@@ -9,11 +9,13 @@ public class LoginModel : PageModel
 {
     private readonly UserService _users;
     private readonly SiteService _site;
+    private readonly ActivityService _activity;
 
-    public LoginModel(UserService users, SiteService site)
+    public LoginModel(UserService users, SiteService site, ActivityService activity)
     {
-        _users = users;
-        _site = site;
+        _users    = users;
+        _site     = site;
+        _activity = activity;
     }
 
     [BindProperty] public string UserName { get; set; } = "";
@@ -59,6 +61,11 @@ public class LoginModel : PageModel
         };
 
         await HttpContext.SignInAsync("MyCMSCookies", principal, props);
+
+        // Activity tracken (kein Tracking für Administratoren)
+        if (!user.Roles.Contains("Administrator"))
+            await _activity.RecordLoginAsync(user.UserName);
+
         return RedirectToPage("/Index");
     }
 }

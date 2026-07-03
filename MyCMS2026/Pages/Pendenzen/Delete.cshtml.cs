@@ -20,6 +20,6 @@ public class PendenzDeleteModel : PageModel
             await _pendenzSvc.DeleteAsync(id, currentUser, isAdmin);
         }
 
-        return Redirect($"/Page/Index?id={returnId}");
+        return RedirectToPage("/Page/Index", new { id = returnId });
     }
 }

@@ -16,6 +16,6 @@ public class PendenzToggleModel : PageModel
         if (!string.IsNullOrEmpty(id))
             await _pendenzSvc.ToggleErledigtAsync(id, User.Identity?.Name ?? "?");
 
-        return Redirect($"/Page/Index?id={returnId}");
+        return RedirectToPage("/Page/Index", new { id = returnId });
     }
 }
