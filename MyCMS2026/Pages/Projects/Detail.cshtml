@@ -1,5 +1,6 @@
 @page "{id}"
 @model MyCMS2026.Pages.Projects.ProjectDetailModel
+@using System.IO
 @inject MyCMS2026.Services.TodoService TodoSvcView
 @inject MyCMS2026.Services.MeetingService MeetingSvcView
 @inject Ganss.Xss.HtmlSanitizer Sanitizer
@@ -192,7 +193,16 @@
                              style="background: @bgTint; border-bottom: 1px solid rgba(0,0,0,.06); cursor: pointer;"
                              data-journal-target="#jBody-@entry.Id" aria-expanded="false">
                             <div class="flex-fill min-w-0">
-                                <div class="fw-bold" style="color: @accent;">@entry.Titel</div>
+                                <div class="fw-bold" style="color: @accent;">
+                                    @entry.Titel
+                                    @if (entry.Files.Any())
+                                    {
+                                        <span class="badge bg-light text-secondary border ms-1 fw-normal"
+                                              style="font-size:.7rem;" title="@entry.Files.Count Datei(en)">
+                                            <i class="bi bi-paperclip"></i> @entry.Files.Count
+                                        </span>
+                                    }
+                                </div>
                                 @* Link-Badge für verknüpfte Aufgabe / Sitzung – Wrapper stoppt Collapse-Trigger *@
                                 @if (!string.IsNullOrEmpty(entry.LinkedTodoId) || !string.IsNullOrEmpty(entry.LinkedMeetingId))
                                 {
@@ -288,6 +298,63 @@
                         <div id="view-@entry.Id" class="card-body px-3 py-3">
                             @* Sanitize: Member-Inhalte können Skripte enthalten (Stored XSS) *@
                             <div class="journal-content">@Html.Raw(Sanitizer.Sanitize(entry.Content))</div>
+
+                            @* Dateien *@
+                            @if (entry.Files.Any() || Model.CanEdit)
+                            {
+                                <div class="mt-3 pt-2 border-top">
+                                    @foreach (var jf in entry.Files)
+                                    {
+                                        var jExt = System.IO.Path.GetExtension(jf.OriginalName).ToLowerInvariant();
+                                        var jIcon = jExt switch {
+                                            ".pdf"               => "bi-file-pdf text-danger",
+                                            ".docx" or ".doc"    => "bi-file-word text-primary",
+                                            ".xlsx" or ".xls"    => "bi-file-excel text-success",
+                                            ".pptx" or ".ppt"    => "bi-file-ppt text-warning",
+                                            ".jpg" or ".jpeg"
+                                                or ".png" or ".gif" => "bi-file-image text-info",
+                                            _                    => "bi-file-earmark"
+                                        };
+                                        <div class="d-flex align-items-center gap-2 mb-1">
+                                            <i class="bi @jIcon fs-6 flex-shrink-0"></i>
+                                            <a asp-page="JournalFile"
+                                               asp-route-projectId="@p.Id"
+                                               asp-route-entryId="@entry.Id"
+                                               asp-route-fileId="@jf.Id"
+                                               asp-route-fileName="@jf.OriginalName"
+                                               class="text-decoration-none flex-grow-1 small">@jf.OriginalName</a>
+                                            <span class="text-muted flex-shrink-0" style="font-size:.75rem">@(jf.Size / 1024) KB</span>
+                                            @if (Model.CanEdit)
+                                            {
+                                                <form method="post" asp-page-handler="DeleteJournalFile"
+                                                      class="d-inline flex-shrink-0">
+                                                    <input type="hidden" name="id" value="@p.Id" />
+                                                    <input type="hidden" name="entryId" value="@entry.Id" />
+                                                    <input type="hidden" name="fileId" value="@jf.Id" />
+                                                    <button type="button" class="btn btn-sm btn-link text-danger p-0"
+                                                            onclick="cmsConfirmDelete(this.closest('form'), 'Datei «@jf.OriginalName.Replace("'", "\\'")» löschen?')"
+                                                            title="Löschen">
+                                                        <i class="bi bi-x-circle"></i>
+                                                    </button>
+                                                </form>
+                                            }
+                                        </div>
+                                    }
+                                    @if (Model.CanEdit)
+                                    {
+                                        <form method="post" asp-page-handler="UploadJournalFile"
+                                              enctype="multipart/form-data"
+                                              class="d-flex gap-2 mt-2" onclick="event.stopPropagation()">
+                                            <input type="hidden" name="id" value="@p.Id" />
+                                            <input type="hidden" name="entryId" value="@entry.Id" />
+                                            <input type="file" name="file" class="form-control form-control-sm" />
+                                            <button type="submit" class="btn btn-outline-secondary btn-sm flex-shrink-0">
+                                                <i class="bi bi-upload me-1"></i>Hochladen
+                                            </button>
+                                        </form>
+                                    }
+                                </div>
+                            }
                         </div>
 
                         @* Edit mode *@

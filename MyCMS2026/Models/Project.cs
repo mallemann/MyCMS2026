@@ -25,6 +25,7 @@ public class Project
 public class JournalEntry
 {
     public string Id { get; set; } = Guid.NewGuid().ToString();
+    public int JournalNr { get; set; } = 0;
     public string Titel { get; set; } = "";
     public string Content { get; set; } = "";   // HTML (TinyMCE)
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
@@ -32,6 +33,7 @@ public class JournalEntry
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public string UpdatedBy { get; set; } = "";
     public List<JournalComment> Comments { get; set; } = new();
+    public List<JournalFile> Files { get; set; } = new();
     // Optionale Verknüpfung mit einer Aufgabe oder Sitzung
     public string? LinkedTodoId { get; set; }
     public string? LinkedMeetingId { get; set; }
@@ -43,4 +45,14 @@ public class JournalComment
     public string Text { get; set; } = "";   // plain text
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public string CreatedBy { get; set; } = "";
+}
+
+public class JournalFile
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    public string OriginalName { get; set; } = "";
+    public string StoredName { get; set; } = "";
+    public long Size { get; set; }
+    public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
+    public string UploadedBy { get; set; } = "";
 }

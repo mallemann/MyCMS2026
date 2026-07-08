@@ -141,6 +141,23 @@ public class ProjectDetailModel : PageModel
         return RedirectToPage(new { id, tab = "journal" });
     }
 
+    public async Task<IActionResult> OnPostUploadJournalFileAsync(string id, string entryId, IFormFile? file)
+    {
+        if (!await LoadProjectAsync(id)) return NotFound();
+        if (!CanEdit) return Forbid();
+        if (file != null && file.Length > 0)
+            await _projects.UploadJournalFileAsync(id, entryId, file, User.Identity?.Name ?? "");
+        return RedirectToPage(new { id, tab = "journal" });
+    }
+
+    public async Task<IActionResult> OnPostDeleteJournalFileAsync(string id, string entryId, string fileId)
+    {
+        if (!await LoadProjectAsync(id)) return NotFound();
+        if (!CanEdit && !IsAdmin) return Forbid();
+        await _projects.DeleteJournalFileAsync(id, entryId, fileId);
+        return RedirectToPage(new { id, tab = "journal" });
+    }
+
     // ── Comments ─────────────────────────────────────────────────────────────
 
     public async Task<IActionResult> OnPostAddCommentAsync(string id, string entryId, string text)

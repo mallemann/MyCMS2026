@@ -6,6 +6,7 @@ namespace MyCMS2026.Services;
 public class ProjectService
 {
     private readonly string _dataFile;
+    private readonly string _uploadsBase;
     private readonly SemaphoreSlim _lock = new(1, 1);
     private List<Project>? _cache;
 
@@ -19,7 +20,9 @@ public class ProjectService
     {
         var dataDir = Path.Combine(env.ContentRootPath, "App_Data");
         Directory.CreateDirectory(dataDir);
-        _dataFile = Path.Combine(dataDir, "projects.json");
+        _dataFile    = Path.Combine(dataDir, "projects.json");
+        _uploadsBase = Path.Combine(dataDir, "uploads", "projects");
+        Directory.CreateDirectory(_uploadsBase);
         if (!File.Exists(_dataFile))
             File.WriteAllText(_dataFile, "[]");
     }
@@ -35,15 +38,37 @@ public class ProjectService
             if (_cache != null) return _cache;
             var json = await File.ReadAllTextAsync(_dataFile);
             var items = JsonSerializer.Deserialize<List<Project>>(json, _jsonOpts) ?? new();
+            bool needSave = false;
+
             // Assign project numbers if needed
             if (items.Any(p => p.ProjectNr == 0))
             {
                 var nextNr = items.Where(p => p.ProjectNr > 0).Select(p => p.ProjectNr).DefaultIfEmpty(0).Max() + 1;
                 foreach (var p in items.Where(p => p.ProjectNr == 0).OrderBy(p => p.CreatedAt))
                     p.ProjectNr = nextNr++;
+                needSave = true;
+            }
+
+            // Assign journal entry numbers if needed (per project)
+            foreach (var project in items)
+            {
+                if (project.Journal.Any(e => e.JournalNr == 0))
+                {
+                    var maxNr = project.Journal.Where(e => e.JournalNr > 0)
+                                               .Select(e => e.JournalNr)
+                                               .DefaultIfEmpty(0).Max();
+                    foreach (var e in project.Journal.Where(e => e.JournalNr == 0).OrderBy(e => e.CreatedAt))
+                        e.JournalNr = ++maxNr;
+                    needSave = true;
+                }
+            }
+
+            if (needSave)
+            {
                 var fixedJson = JsonSerializer.Serialize(items, _jsonOpts);
                 await File.WriteAllTextAsync(_dataFile, fixedJson);
             }
+
             _cache = items;
             return _cache;
         }
@@ -162,6 +187,7 @@ public class ProjectService
         var entry = new JournalEntry
         {
             Id              = Guid.NewGuid().ToString(),
+            JournalNr       = project.Journal.Count == 0 ? 1 : project.Journal.Max(e => e.JournalNr) + 1,
             Titel           = titel,
             Content         = "",
             CreatedAt       = DateTime.UtcNow,
@@ -169,6 +195,7 @@ public class ProjectService
             CreatedBy       = createdBy,
             UpdatedBy       = createdBy,
             Comments        = new List<JournalComment>(),
+            Files           = new List<JournalFile>(),
             LinkedTodoId    = linkedTodoId,
             LinkedMeetingId = linkedMeetingId
         };
@@ -188,13 +215,15 @@ public class ProjectService
         var entry = new JournalEntry
         {
             Id        = Guid.NewGuid().ToString(),
+            JournalNr = project.Journal.Count == 0 ? 1 : project.Journal.Max(e => e.JournalNr) + 1,
             Titel     = titel,
             Content   = content,
             CreatedAt = createdAt.HasValue ? DateTime.SpecifyKind(createdAt.Value, DateTimeKind.Local).ToUniversalTime() : DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
             CreatedBy = createdBy,
             UpdatedBy = createdBy,
-            Comments  = new List<JournalComment>()
+            Comments  = new List<JournalComment>(),
+            Files     = new List<JournalFile>()
         };
         project.Journal.Insert(0, entry);   // newest first
         project.UpdatedAt = DateTime.UtcNow;
@@ -229,6 +258,14 @@ public class ProjectService
         if (project == null) return false;
         var entry = project.Journal.FirstOrDefault(e => e.Id == entryId);
         if (entry == null) return false;
+
+        // Dateiverzeichnis des Journaleintrags mitlöschen
+        if (entry.JournalNr > 0)
+        {
+            var dir = GetJournalDir(project.ProjectNr, entry.JournalNr);
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+
         project.Journal.Remove(entry);
         project.UpdatedAt = DateTime.UtcNow;
         await SaveAsync(items);
@@ -272,5 +309,94 @@ public class ProjectService
         project.UpdatedAt = DateTime.UtcNow;
         await SaveAsync(items);
         return true;
+    }
+
+    // ── Journal Files ────────────────────────────────────────────────────────
+
+    private string GetJournalDir(int projectNr, int journalNr) =>
+        Path.Combine(_uploadsBase, projectNr.ToString(), journalNr.ToString());
+
+    public string GetJournalFilePath(int projectNr, int journalNr, string storedName) =>
+        Path.Combine(GetJournalDir(projectNr, journalNr), storedName);
+
+    private static string ResolveStoredName(string dir, string originalName)
+    {
+        var name      = Path.GetFileNameWithoutExtension(originalName);
+        var ext       = Path.GetExtension(originalName);
+        var candidate = originalName;
+        var counter   = 2;
+        while (File.Exists(Path.Combine(dir, candidate)))
+        {
+            candidate = $"{name}_{counter}{ext}";
+            counter++;
+        }
+        return candidate;
+    }
+
+    public async Task<JournalFile?> UploadJournalFileAsync(
+        string projectId, string entryId, IFormFile file, string uploadedBy)
+    {
+        var items = await LoadAsync();
+        var project = items.FirstOrDefault(p => p.Id == projectId);
+        if (project == null) return null;
+        var entry = project.Journal.FirstOrDefault(e => e.Id == entryId);
+        if (entry == null) return null;
+
+        var dir = GetJournalDir(project.ProjectNr, entry.JournalNr);
+        Directory.CreateDirectory(dir);
+        var original   = Path.GetFileName(file.FileName);
+        var storedName = ResolveStoredName(dir, original);
+        var path       = Path.Combine(dir, storedName);
+        using (var stream = File.Create(path))
+            await file.CopyToAsync(stream);
+
+        var jf = new JournalFile
+        {
+            OriginalName = original,
+            StoredName   = storedName,
+            Size         = file.Length,
+            UploadedAt   = DateTime.UtcNow,
+            UploadedBy   = uploadedBy
+        };
+        entry.Files.Add(jf);
+        project.UpdatedAt = DateTime.UtcNow;
+        project.UpdatedBy = uploadedBy;
+        await SaveAsync(items);
+        return jf;
+    }
+
+    public async Task<bool> DeleteJournalFileAsync(string projectId, string entryId, string fileId)
+    {
+        var items = await LoadAsync();
+        var project = items.FirstOrDefault(p => p.Id == projectId);
+        if (project == null) return false;
+        var entry = project.Journal.FirstOrDefault(e => e.Id == entryId);
+        if (entry == null) return false;
+        var file = entry.Files.FirstOrDefault(f => f.Id == fileId);
+        if (file == null) return false;
+
+        var path = GetJournalFilePath(project.ProjectNr, entry.JournalNr, file.StoredName);
+        if (File.Exists(path)) File.Delete(path);
+        entry.Files.Remove(file);
+        project.UpdatedAt = DateTime.UtcNow;
+        await SaveAsync(items);
+        return true;
+    }
+
+    public string GetMimeType(string fileName)
+    {
+        var ext = Path.GetExtension(fileName).ToLowerInvariant();
+        return ext switch
+        {
+            ".pdf"  => "application/pdf",
+            ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ".pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png"  => "image/png",
+            ".zip"  => "application/zip",
+            ".txt"  => "text/plain",
+            _       => "application/octet-stream"
+        };
     }
 }
