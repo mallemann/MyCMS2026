@@ -14,4 +14,8 @@ public class AppUser
     public DateTime? LastLoginAt { get; set; }
     public string? PasswordResetToken { get; set; }
     public DateTime? PasswordResetTokenExpiry { get; set; }
+
+    // Brute-Force-Schutz: Fehlversuche zählen und Konto temporär sperren.
+    public int AccessFailedCount { get; set; }
+    public DateTime? LockoutEnd { get; set; }
 }

@@ -4,8 +4,17 @@ using MyCMS2026.Models;
 
 namespace MyCMS2026.Services;
 
+/// <summary>Ergebnis einer Anmeldeprüfung inkl. Brute-Force-Sperre.</summary>
+public enum LoginStatus { Success, InvalidCredentials, LockedOut }
+
+public record LoginResult(LoginStatus Status, AppUser? User, DateTime? LockoutEnd = null);
+
 public class UserService
 {
+    // Brute-Force-Schutz analog MasSafe: 5 Fehlversuche -> 15 Minuten Sperre.
+    private const int MaxFailedAccessAttempts = 5;
+    private static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
+
     private readonly string _usersFile;
     private readonly SemaphoreSlim _lock = new(1, 1);
     private List<AppUser>? _cache;
@@ -64,17 +73,39 @@ public class UserService
         finally { _lock.Release(); }
     }
 
-    public async Task<AppUser?> ValidateAsync(string userName, string password)
+    public async Task<LoginResult> ValidateAsync(string userName, string password)
     {
         var users = await LoadAsync();
         var user = users.FirstOrDefault(u =>
             u.UserName.Equals(userName, StringComparison.OrdinalIgnoreCase) && u.IsActive);
-        if (user == null) return null;
-        if (!BCrypt.Net.BCrypt.Verify(password, user.PasswordHash)) return null;
+        if (user == null) return new LoginResult(LoginStatus.InvalidCredentials, null);
+
+        // Bereits gesperrt? -> auch bei korrektem Passwort abweisen (wie ASP.NET Identity).
+        if (user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTime.UtcNow)
+            return new LoginResult(LoginStatus.LockedOut, null, user.LockoutEnd);
+
+        // Passwort falsch -> Fehlversuch zählen, ggf. sperren.
+        if (!BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
+        {
+            user.AccessFailedCount++;
+            if (user.AccessFailedCount >= MaxFailedAccessAttempts)
+            {
+                user.LockoutEnd = DateTime.UtcNow.Add(LockoutDuration);
+                user.AccessFailedCount = 0;
+                await SaveAsync(users);
+                return new LoginResult(LoginStatus.LockedOut, null, user.LockoutEnd);
+            }
+            await SaveAsync(users);
+            return new LoginResult(LoginStatus.InvalidCredentials, null);
+        }
+
+        // Erfolg -> Zähler und Sperre zurücksetzen.
+        user.AccessFailedCount = 0;
+        user.LockoutEnd = null;
         user.LoginCount++;
         user.LastLoginAt = DateTime.Now;
         await SaveAsync(users);
-        return user;
+        return new LoginResult(LoginStatus.Success, user);
     }
 
     public async Task<List<AppUser>> GetAllAsync() => await LoadAsync();

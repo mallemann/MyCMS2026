@@ -41,12 +41,18 @@ public class LoginModel : PageModel
         SiteTitle   = cfg.Title;
         SiteLogoUrl = cfg.LogoUrl;
 
-        var user = await _users.ValidateAsync(UserName, Password);
-        if (user == null)
+        var login = await _users.ValidateAsync(UserName, Password);
+        if (login.Status == LoginStatus.LockedOut)
+        {
+            ErrorMessage = "Konto vorübergehend gesperrt (zu viele Fehlversuche). Bitte in etwa 15 Minuten erneut versuchen.";
+            return Page();
+        }
+        if (login.Status != LoginStatus.Success || login.User == null)
         {
             ErrorMessage = "Benutzername oder Passwort ungültig.";
             return Page();
         }
+        var user = login.User;
 
         // Offline-Sperre: Nur Administratoren dürfen sich anmelden
         if (cfg.Status == "Offline" && !user.Roles.Contains("Administrator"))
