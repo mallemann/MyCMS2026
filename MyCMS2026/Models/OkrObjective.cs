@@ -5,6 +5,7 @@ public class OkrObjective
     public string Id { get; set; } = Guid.NewGuid().ToString();
     public string Text { get; set; } = "";
     public string Status { get; set; } = "aktiv";   // aktiv | abgeschlossen
+    public string Gruppe { get; set; } = "";        // leer = für alle sichtbar (analog Todo/Meeting)
     public int Year { get; set; } = DateTime.Now.Year;
     public List<OkrKeyResult> KeyResults { get; set; } = new();
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

@@ -2,9 +2,22 @@
 @using MyCMS2026.Services
 @using MyCMS2026.Models
 @inject OkrService OkrSvc
+@inject WeeklyMailService WeeklyMailSvc
+@inject GruppenService GruppenSvc
 @{
     var isAdmin = User.IsInRole("Administrator");
     var pageId  = Model.Id;
+
+    // Gruppen des aktuellen Benutzers aus Reporting Settings
+    var okrUserName  = User.Identity?.Name ?? "";
+    var okrConfig    = await WeeklyMailSvc.GetConfigAsync();
+    var okrRecipient = okrConfig.Recipients.FirstOrDefault(r =>
+        string.Equals(r.UserId, okrUserName, StringComparison.OrdinalIgnoreCase));
+    var okrAllowedGruppen = okrRecipient?.AllowedGruppen ?? new List<string>();
+    var okrFilterByGroup  = okrAllowedGruppen.Any();
+
+    // Gruppen-Liste für Admin-Dropdowns
+    var alleGruppen = await GruppenSvc.GetAllAsync();
 
     // Jahr aus Query-String, Fallback auf aktuelles Jahr
     var allYears    = await OkrSvc.GetYearsAsync();
@@ -16,6 +29,23 @@
 
     var showAll  = Context.Request.Query["showAll"].ToString() == "true";
     var all      = await OkrSvc.GetByYearAsync(currentYear);
+
+    // Sichtbarkeit nach Reporting-Gruppen (analog Dashboard/Timeline/ToDos/Meetings)
+    if (isAdmin && !okrFilterByGroup)
+    {
+        // Admin ohne Gruppen-Zuordnung → alles
+    }
+    else if (okrFilterByGroup)
+    {
+        all = all.Where(o =>
+            string.IsNullOrEmpty(o.Gruppe) ||
+            okrAllowedGruppen.Contains(o.Gruppe, StringComparer.OrdinalIgnoreCase)).ToList();
+    }
+    else
+    {
+        all = new List<MyCMS2026.Models.OkrObjective>();
+    }
+
     var objectives = showAll ? all : all.Where(o => o.Status == "aktiv").ToList();
 }
 
@@ -65,6 +95,10 @@
                 <div class="mt-1">
                     <span class="badge bg-light text-dark me-1">@obj.Year</span>
                     <span class="badge @(obj.Status == "aktiv" ? "bg-success" : "bg-secondary")">@obj.Status</span>
+                    @if (!string.IsNullOrEmpty(obj.Gruppe))
+                    {
+                        <span class="badge bg-light text-dark border ms-1"><i class="bi bi-people me-1"></i>@obj.Gruppe</span>
+                    }
                 </div>
             </div>
             @if (isAdmin)
@@ -73,6 +107,7 @@
                     <button class="btn btn-sm btn-outline-light"
                             data-obj-id="@obj.Id" data-obj-text="@obj.Text"
                             data-obj-status="@obj.Status" data-obj-year="@obj.Year"
+                            data-obj-gruppe="@obj.Gruppe"
                             onclick="wOkrEditObjective(this)">
                         <i class="bi bi-pencil"></i>
                     </button>
@@ -212,14 +247,26 @@
                             <label class="form-label fw-semibold">Objective Text *</label>
                             <textarea name="text" class="form-control" rows="3" required></textarea>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Jahr</label>
-                            <select name="year" class="form-select">
-                                @for (var y = DateTime.Now.Year + 1; y >= DateTime.Now.Year - 3; y--)
-                                {
-                                    <option value="@y" selected="@(y == currentYear)">@y</option>
-                                }
-                            </select>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label fw-semibold">Jahr</label>
+                                <select name="year" class="form-select">
+                                    @for (var y = DateTime.Now.Year + 1; y >= DateTime.Now.Year - 3; y--)
+                                    {
+                                        <option value="@y" selected="@(y == currentYear)">@y</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-semibold">Gruppe</label>
+                                <select name="gruppe" class="form-select">
+                                    <option value="">– für alle sichtbar –</option>
+                                    @foreach (var g in alleGruppen)
+                                    {
+                                        <option value="@g">@g</option>
+                                    }
+                                </select>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -261,6 +308,16 @@
                                 <input type="number" name="year" id="wOkrEditYear" class="form-control" />
                             </div>
                         </div>
+                        <div class="mt-3">
+                            <label class="form-label fw-semibold">Gruppe</label>
+                            <select name="gruppe" id="wOkrEditGruppe" class="form-select">
+                                <option value="">– für alle sichtbar –</option>
+                                @foreach (var g in alleGruppen)
+                                {
+                                    <option value="@g">@g</option>
+                                }
+                            </select>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
@@ -278,6 +335,7 @@ function wOkrEditObjective(btn) {
     document.getElementById('wOkrEditText').value   = btn.dataset.objText;
     document.getElementById('wOkrEditStatus').value = btn.dataset.objStatus;
     document.getElementById('wOkrEditYear').value   = btn.dataset.objYear;
+    document.getElementById('wOkrEditGruppe').value = btn.dataset.objGruppe || '';
     new bootstrap.Modal(document.getElementById('wOkrModalEdit')).show();
 }
 </script>

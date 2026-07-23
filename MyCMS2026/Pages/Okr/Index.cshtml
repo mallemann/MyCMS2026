@@ -1,9 +1,11 @@
 @page
 @model MyCMS2026.Pages.Okr.OkrIndexModel
+@inject MyCMS2026.Services.GruppenService GruppenSvc
 @{
     ViewData["Title"] = "OKR";
     var isAdmin = User.IsInRole("Administrator");
     var currentYear = Model.SelectedYear ?? DateTime.Now.Year;
+    var alleGruppen = await GruppenSvc.GetAllAsync();
 }
 
 <div class="cms-page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -57,6 +59,10 @@
                     <h5 class="mb-1">@obj.Text</h5>
                     <span class="badge bg-secondary me-1">@obj.Year</span>
                     <span class="badge @(obj.Status == "aktiv" ? "bg-success" : "bg-secondary")">@obj.Status</span>
+                    @if (!string.IsNullOrEmpty(obj.Gruppe))
+                    {
+                        <span class="badge bg-light text-dark border ms-1"><i class="bi bi-people me-1"></i>@obj.Gruppe</span>
+                    }
                 </div>
                 @if (isAdmin)
                 {
@@ -66,6 +72,7 @@
                                 data-obj-text="@obj.Text"
                                 data-obj-status="@obj.Status"
                                 data-obj-year="@obj.Year"
+                                data-obj-gruppe="@obj.Gruppe"
                                 onclick="editObjective(this)">
                             <i class="bi bi-pencil"></i>
                         </button>
@@ -200,14 +207,26 @@
                             <label class="form-label fw-semibold">Objective Text *</label>
                             <textarea name="text" class="form-control" rows="3" required></textarea>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Jahr</label>
-                            <select name="year" class="form-select">
-                                @for (var y = DateTime.Now.Year + 1; y >= DateTime.Now.Year - 3; y--)
-                                {
-                                    <option value="@y" selected="@(y == currentYear ? "selected" : null)">@y</option>
-                                }
-                            </select>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label fw-semibold">Jahr</label>
+                                <select name="year" class="form-select">
+                                    @for (var y = DateTime.Now.Year + 1; y >= DateTime.Now.Year - 3; y--)
+                                    {
+                                        <option value="@y" selected="@(y == currentYear ? "selected" : null)">@y</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-semibold">Gruppe</label>
+                                <select name="gruppe" class="form-select">
+                                    <option value="">– für alle sichtbar –</option>
+                                    @foreach (var g in alleGruppen)
+                                    {
+                                        <option value="@g">@g</option>
+                                    }
+                                </select>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -246,6 +265,16 @@
                                 <input type="number" name="year" id="editObjYear" class="form-control" />
                             </div>
                         </div>
+                        <div class="mt-3">
+                            <label class="form-label fw-semibold">Gruppe</label>
+                            <select name="gruppe" id="editObjGruppe" class="form-select">
+                                <option value="">– für alle sichtbar –</option>
+                                @foreach (var g in alleGruppen)
+                                {
+                                    <option value="@g">@g</option>
+                                }
+                            </select>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
@@ -264,6 +293,7 @@ function editObjective(btn) {
     document.getElementById('editObjText').value = btn.dataset.objText;
     document.getElementById('editObjStatus').value = btn.dataset.objStatus;
     document.getElementById('editObjYear').value = btn.dataset.objYear;
+    document.getElementById('editObjGruppe').value = btn.dataset.objGruppe || '';
     new bootstrap.Modal(document.getElementById('modalEditObjective')).show();
 }
 </script>

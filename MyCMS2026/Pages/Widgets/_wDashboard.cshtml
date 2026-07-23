@@ -27,10 +27,12 @@
 
     List<TodoItem> todos;
     List<Meeting>  meetings;
+    List<OkrObjective> okrs;
     if (ShowAll)
     {
         todos    = allTodos;
         meetings = allMeetings;
+        okrs     = allOkr;
     }
     else if (filterByGroup)
     {
@@ -40,11 +42,15 @@
         meetings = allMeetings.Where(m =>
             string.IsNullOrEmpty(m.Gruppe) ||
             allowedGruppen.Contains(m.Gruppe, StringComparer.OrdinalIgnoreCase)).ToList();
+        okrs = allOkr.Where(o =>
+            string.IsNullOrEmpty(o.Gruppe) ||
+            allowedGruppen.Contains(o.Gruppe, StringComparer.OrdinalIgnoreCase)).ToList();
     }
     else
     {
         todos    = new List<TodoItem>();
         meetings = new List<Meeting>();
+        okrs     = new List<OkrObjective>();
     }
 
     var today    = DateTime.Today;
@@ -56,7 +62,7 @@
     var offeneTasks        = offen.Count;
     var ueberfaelligeTasks = offen.Count(t => t.ErledigenBis < today);
     var erledigteTasks     = erledigt.Count;
-    var activeObjs         = allOkr.Where(o => o.KeyResults.Any()).ToList();
+    var activeObjs         = okrs.Where(o => o.KeyResults.Any()).ToList();
 
     // ── JSON-Daten für Charts ─────────────────────────────────────────────────
     var taskStatusJson = JsonSerializer.Serialize(new[]

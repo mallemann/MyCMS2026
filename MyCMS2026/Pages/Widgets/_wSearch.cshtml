@@ -108,10 +108,10 @@
             AllowGruppe(m.Gruppe) && Matches(CombineMeeting(m))
         ).OrderByDescending(m => m.Datum).ToList();
 
-        // Downloads
+        // Downloads (gruppen-eingeschränkt wie ToDos/Meetings)
         var downloads = await DownloadSvc.GetAllAsync();
         downloadResults = downloads.Where(d =>
-            Matches(CombineDownload(d))
+            AllowGruppe(d.Gruppe) && Matches(CombineDownload(d))
         ).ToList();
 
         // Projekte + Journal

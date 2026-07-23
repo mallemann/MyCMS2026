@@ -39,8 +39,18 @@
     var meetingKlassen = await KlassenSvc.GetKlassenAsync("meetings");
 }
 
-@* Klasse/Status-Filter *@
+@* Klasse/Status/Gruppen-Filter *@
 <div class="d-flex flex-wrap gap-2 mb-3">
+    @if (allowedGruppen.Count > 1)
+    {
+        <select id="tlFilterGruppe" class="form-select form-select-sm" style="width:auto;">
+            <option value="">Alle meine Gruppen</option>
+            @foreach (var g in allowedGruppen)
+            {
+                <option value="@g">@g</option>
+            }
+        </select>
+    }
     <select id="tlFilterKlasse" class="form-select form-select-sm" style="width:auto;">
         <option value="">Alle Klassen</option>
         @foreach (var k in meetingKlassen)
@@ -80,7 +90,7 @@ else
             else if (m.Status == "Abgesagt")      badgeClass = "bg-danger";
             else                                   badgeClass = "bg-primary";
 
-            <div class="timeline-item" data-klasse="@m.Klasse" data-status="@m.Status">
+            <div class="timeline-item" data-klasse="@m.Klasse" data-status="@m.Status" data-gruppe="@m.Gruppe">
                 <div class="timeline-marker">
                     <div class="timeline-dot"></div>
                     <div class="timeline-line"></div>
@@ -142,14 +152,18 @@ else
 (function () {
     const FILTER_KEY = 'mycms_timeline_filter';
 
+    const gruppeSel = document.getElementById('tlFilterGruppe');
+
     function applyFilter() {
         const klasse = document.getElementById('tlFilterKlasse').value;
         const status = document.getElementById('tlFilterStatus').value;
-        sessionStorage.setItem(FILTER_KEY, JSON.stringify({ klasse, status }));
+        const gruppe = gruppeSel ? gruppeSel.value : '';
+        sessionStorage.setItem(FILTER_KEY, JSON.stringify({ klasse, status, gruppe }));
         document.querySelectorAll('#tlTimeline .timeline-item').forEach(function (item) {
             const matchK = !klasse || item.dataset.klasse === klasse;
             const matchS = !status || item.dataset.status === status;
-            item.style.display = matchK && matchS ? '' : 'none';
+            const matchG = !gruppe || item.dataset.gruppe === gruppe;
+            item.style.display = matchK && matchS && matchG ? '' : 'none';
         });
     }
 
@@ -158,14 +172,16 @@ else
         const saved = sessionStorage.getItem(FILTER_KEY);
         if (!saved) return;
         try {
-            const { klasse, status } = JSON.parse(saved);
+            const { klasse, status, gruppe } = JSON.parse(saved);
             if (klasse) document.getElementById('tlFilterKlasse').value = klasse;
             if (status) document.getElementById('tlFilterStatus').value = status;
+            if (gruppe && gruppeSel) gruppeSel.value = gruppe;
             applyFilter();
         } catch (e) {}
     })();
 
     document.getElementById('tlFilterKlasse').addEventListener('change', applyFilter);
     document.getElementById('tlFilterStatus').addEventListener('change', applyFilter);
+    if (gruppeSel) gruppeSel.addEventListener('change', applyFilter);
 })();
 </script>

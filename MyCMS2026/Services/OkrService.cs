@@ -69,7 +69,7 @@ public class OkrService
         return obj;
     }
 
-    public async Task<bool> UpdateObjectiveAsync(string id, string text, string status, int year)
+    public async Task<bool> UpdateObjectiveAsync(string id, string text, string status, int year, string gruppe)
     {
         var items = await LoadAsync();
         var obj = items.FirstOrDefault(o => o.Id == id);
@@ -77,6 +77,7 @@ public class OkrService
         obj.Text   = text;
         obj.Status = status;
         obj.Year   = year;
+        obj.Gruppe = gruppe ?? "";
         await SaveAsync(items);
         return true;
     }

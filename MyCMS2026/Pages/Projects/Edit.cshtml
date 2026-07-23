@@ -35,6 +35,7 @@
             <input type="hidden" asp-for="Input.ProjectNr" />
             <input type="hidden" asp-for="Input.CreatedAt" />
             <input type="hidden" asp-for="Input.CreatedBy" />
+            <input type="hidden" asp-for="ReturnPageId" />
 
             <div class="mb-3">
                 <label class="form-label fw-semibold">Projektname <span class="text-danger">*</span></label>
@@ -93,14 +94,23 @@
                 <div class="row g-3 mb-3">
                     <div class="col-md-4">
                         <label class="form-label fw-semibold">Gruppe <span class="text-danger">*</span></label>
-                        <select asp-for="Input.Gruppe" class="form-select">
-                            <option value="">– keine –</option>
-                            @foreach (var g in Model.AvailableGruppen)
-                            {
-                                <option value="@g" selected="@(Model.Input.Gruppe == g)">@g</option>
-                            }
-                        </select>
-                        <div class="form-text">Gruppe, zu der dieses Projekt gehört.</div>
+                        @if (Model.GruppeLocked)
+                        {
+                            <input type="text" class="form-control" value="@Model.LockedGruppe" readonly />
+                            <input type="hidden" asp-for="Input.Gruppe" />
+                            <div class="form-text"><i class="bi bi-lock me-1"></i>Von der Seite vorgegeben.</div>
+                        }
+                        else
+                        {
+                            <select asp-for="Input.Gruppe" class="form-select">
+                                <option value="">– keine –</option>
+                                @foreach (var g in Model.AvailableGruppen)
+                                {
+                                    <option value="@g" selected="@(Model.Input.Gruppe == g)">@g</option>
+                                }
+                            </select>
+                            <div class="form-text">Gruppe, zu der dieses Projekt gehört.</div>
+                        }
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-semibold">Lesen (Rolle)</label>
@@ -125,6 +135,19 @@
                         <div class="form-text">Wer darf Journal/Metadaten bearbeiten?</div>
                     </div>
                 </div>
+            }
+            else if (Model.GruppeLocked)
+            {
+                @* Projektleiter auf gruppen-scoped Seite: Gruppe fix, Rollen werden serverseitig gesetzt *@
+                <hr />
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Gruppe</label>
+                    <input type="text" class="form-control" value="@Model.LockedGruppe" readonly />
+                    <input type="hidden" asp-for="Input.Gruppe" />
+                    <div class="form-text"><i class="bi bi-lock me-1"></i>Dieses Projekt wird zwingend der Gruppe «@Model.LockedGruppe» zugeordnet.</div>
+                </div>
+                <input type="hidden" asp-for="Input.LeseRolle" />
+                <input type="hidden" asp-for="Input.BearbeitenRolle" />
             }
             else
             {

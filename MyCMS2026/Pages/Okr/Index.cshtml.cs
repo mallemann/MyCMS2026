@@ -10,12 +10,18 @@ namespace MyCMS2026.Pages.Okr;
 public class OkrIndexModel : PageModel
 {
     private readonly OkrService _okr;
-    public OkrIndexModel(OkrService okr) => _okr = okr;
+    private readonly WeeklyMailService _weeklyMail;
+    public OkrIndexModel(OkrService okr, WeeklyMailService weeklyMail)
+    {
+        _okr        = okr;
+        _weeklyMail = weeklyMail;
+    }
 
     public List<OkrObjective> Objectives { get; set; } = new();
     public List<int> Years { get; set; } = new();
     public int? SelectedYear { get; set; }
     public bool ShowAll { get; set; }
+    public List<string> AllowedGruppen { get; set; } = new();
 
     public async Task OnGetAsync(int? year, bool showAll = false)
     {
@@ -26,6 +32,30 @@ public class OkrIndexModel : PageModel
         var all = year.HasValue
             ? await _okr.GetByYearAsync(year.Value)
             : await _okr.GetAllAsync();
+
+        // Sichtbarkeit nach Reporting-Gruppen (analog Dashboard/Timeline/ToDos/Meetings)
+        var userName  = User.Identity?.Name ?? "";
+        var isAdmin   = User.IsInRole("Administrator");
+        var config    = await _weeklyMail.GetConfigAsync();
+        var recipient = config.Recipients.FirstOrDefault(r =>
+            string.Equals(r.UserId, userName, StringComparison.OrdinalIgnoreCase));
+        AllowedGruppen = recipient?.AllowedGruppen ?? new List<string>();
+        var filterByGroup = AllowedGruppen.Any();
+
+        if (isAdmin && !filterByGroup)
+        {
+            // Admin ohne Gruppen-Zuordnung → alles
+        }
+        else if (filterByGroup)
+        {
+            all = all.Where(o =>
+                string.IsNullOrEmpty(o.Gruppe) ||
+                AllowedGruppen.Contains(o.Gruppe, StringComparer.OrdinalIgnoreCase)).ToList();
+        }
+        else
+        {
+            all = new List<OkrObjective>();
+        }
 
         Objectives = showAll ? all : all.Where(o => o.Status == "aktiv").ToList();
     }
@@ -39,17 +69,17 @@ public class OkrIndexModel : PageModel
         return RedirectToPage(new { year });
     }
 
-    public async Task<IActionResult> OnPostAddObjectiveAsync(string text, int year, string? returnPageId)
+    public async Task<IActionResult> OnPostAddObjectiveAsync(string text, int year, string? gruppe, string? returnPageId)
     {
         if (!User.IsInRole("Administrator")) return Forbid();
-        await _okr.CreateObjectiveAsync(new OkrObjective { Text = text, Year = year, Status = "aktiv" });
+        await _okr.CreateObjectiveAsync(new OkrObjective { Text = text, Year = year, Status = "aktiv", Gruppe = gruppe ?? "" });
         return RedirectBack(returnPageId, year);
     }
 
-    public async Task<IActionResult> OnPostEditObjectiveAsync(string objectiveId, string text, string status, int year, string? returnPageId, int? okrYear)
+    public async Task<IActionResult> OnPostEditObjectiveAsync(string objectiveId, string text, string status, int year, string? gruppe, string? returnPageId, int? okrYear)
     {
         if (!User.IsInRole("Administrator")) return Forbid();
-        await _okr.UpdateObjectiveAsync(objectiveId, text, status, year);
+        await _okr.UpdateObjectiveAsync(objectiveId, text, status, year, gruppe ?? "");
         return RedirectBack(returnPageId, okrYear ?? year);
     }
 
