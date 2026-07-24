@@ -1,4 +1,7 @@
 @model MyCMS2026.Pages.Page.PageIndexModel
+@inject MyCMS2026.Services.KontextService KontextSvc
+@inject MyCMS2026.Services.WeeklyMailService WeeklyMailSvc
+@inject MyCMS2026.Services.UserService UserSvc
 @{
     var userName  = User.Identity?.Name ?? "";
     var userRoles = User.Claims
@@ -9,6 +12,15 @@
     // Cookie auslesen (serverseitig, damit JS-loses Rendering funktioniert)
     var menuLayout = Context.Request.Cookies["CmsMenuLayout"] ?? "vertical";
     var isHorizontal = menuLayout == "horizontal";
+
+    // Kontexte des Users (nur solche, deren Gruppe ihm vom Admin zugeordnet ist = Baseline)
+    var baselineGruppen = await WeeklyMailSvc.GetBaselineGruppenAsync(userName);
+    var alleKontexte    = await KontextSvc.GetAllAsync();
+    var meineKontexte   = alleKontexte
+        .Where(k => baselineGruppen.Contains(k.Gruppe, StringComparer.OrdinalIgnoreCase))
+        .ToList();
+    var meUser      = await UserSvc.GetByNameAsync(userName);
+    var deaktiviert = meUser?.DeaktivierteKontexte ?? new List<string>();
 }
 
 <div class="row g-4">
@@ -80,6 +92,46 @@
             </div>
         </div>
     </div>
+
+    @* ── Kontexte ─────────────────────────────────────────── *@
+    @if (meineKontexte.Any())
+    {
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header card-header-cms">
+                    <i class="bi bi-diagram-3 me-2"></i>Kontexte
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        Schalte einzelne Kontexte aus, um die zugehörige Gruppe temporär auszublenden
+                        (Navigation, Suche, Timeline, Dashboard und Weekly Mail). Du kannst sie jederzeit wieder einschalten.
+                    </p>
+                    <form method="post" asp-page="/Account/Kontexte" asp-page-handler="Save">
+                        <input type="hidden" name="returnPageId" value="@Model.Id" />
+                        @for (int i = 0; i < meineKontexte.Count; i++)
+                        {
+                            var k = meineKontexte[i];
+                            var isOn = !deaktiviert.Contains(k.Gruppe, StringComparer.OrdinalIgnoreCase);
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" role="switch"
+                                       name="aktiv" value="@k.Gruppe" id="ctx_@i" @(isOn ? "checked" : "") />
+                                <label class="form-check-label" for="ctx_@i">
+                                    <span class="fw-semibold">@k.Gruppe</span>
+                                    @if (!string.IsNullOrEmpty(k.Beschreibung))
+                                    {
+                                        <span class="text-muted small">– @k.Beschreibung</span>
+                                    }
+                                </label>
+                            </div>
+                        }
+                        <button type="submit" class="btn btn-cms btn-sm mt-2">
+                            <i class="bi bi-floppy me-1"></i>Speichern
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    }
 
 </div>
 

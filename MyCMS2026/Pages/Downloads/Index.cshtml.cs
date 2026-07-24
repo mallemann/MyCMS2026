@@ -91,7 +91,7 @@ public class DownloadsIndexModel : PageModel
         string id, string beschreibung, string klasse, string? gruppe, string? navItemId)
     {
         if (!await CanEditAsync(navItemId)) return Forbid();
-        await _downloads.UpdateAsync(id, beschreibung ?? "", klasse ?? "");
+        await _downloads.UpdateAsync(id, beschreibung ?? "", klasse ?? "", gruppe);
         return RedirectToPage(new { gruppe = string.IsNullOrWhiteSpace(gruppe) ? null : gruppe });
     }
 

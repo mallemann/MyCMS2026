@@ -54,6 +54,7 @@ builder.Services.AddSingleton<DownloadService>();
 builder.Services.AddSingleton<OkrService>();
 builder.Services.AddSingleton<KlassenService>();
 builder.Services.AddSingleton<GruppenService>();
+builder.Services.AddSingleton<KontextService>();
 builder.Services.AddSingleton<VaultService>();
 builder.Services.AddSingleton<ProjectService>();
 builder.Services.AddSingleton<WeeklyMailService>();

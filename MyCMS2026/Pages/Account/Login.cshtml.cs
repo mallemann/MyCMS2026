@@ -61,7 +61,7 @@ public class LoginModel : PageModel
             return Page();
         }
 
-        var principal = _users.BuildPrincipal(user);
+        var principal = await _users.BuildPrincipalAsync(user);
         var props = new AuthenticationProperties
         {
             IsPersistent = RememberMe,

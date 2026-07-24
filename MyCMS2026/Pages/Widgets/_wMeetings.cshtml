@@ -18,10 +18,8 @@
     var klasse = Context.Request.Query["klasse"].ToString();
     var meine  = Context.Request.Query["meine"].ToString() == "1";
 
-    // Access-Gruppen des Users (Sichtbarkeits-Gate; ConfigString verengt zusätzlich)
-    var cfg            = await WeeklyMailSvc.GetConfigAsync();
-    var recipient      = cfg.Recipients.FirstOrDefault(r => string.Equals(r.UserId, currentUser, StringComparison.OrdinalIgnoreCase));
-    var allowedGruppen = recipient?.AllowedGruppen ?? new List<string>();
+    // Effektive Access-Gruppen des Users (Baseline minus deaktivierte Kontexte); ConfigString verengt zusätzlich
+    var allowedGruppen = await WeeklyMailSvc.GetAllowedGruppenAsync(currentUser);
     bool CanSeeGr(string? g)
     {
         if (isAdmin) return string.IsNullOrWhiteSpace(gruppe) || string.Equals(g, gruppe, StringComparison.OrdinalIgnoreCase);

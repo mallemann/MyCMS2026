@@ -19,10 +19,8 @@
     var pageId       = Model.Id;
 
     // Reporting-Einstellungen für aktuellen User (gleiche Filterlogik wie Weekly Mail)
-    var cfg          = await WeeklyMailSvc.GetConfigAsync();
-    var recipient    = cfg.Recipients.FirstOrDefault(r =>
-        r.UserId.Equals(userName, StringComparison.OrdinalIgnoreCase));
-    var allowedGruppen = recipient?.AllowedGruppen ?? new List<string>();
+    // Effektive Access-Gruppen des Users (Baseline minus deaktivierte Kontexte)
+    var allowedGruppen = await WeeklyMailSvc.GetAllowedGruppenAsync(userName);
 
     // ── Hilfsmethoden ────────────────────────────────────────────────────────
     string StripHtml(string? s) => string.IsNullOrEmpty(s) ? "" :

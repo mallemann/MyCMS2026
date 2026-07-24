@@ -77,12 +77,26 @@ public class WeeklyMailService
 
     public async Task<WeeklyMailConfig> GetConfigAsync() => await LoadAsync();
 
-    /// <summary>Access-Gruppen eines Users (leer, wenn kein Recipient konfiguriert).</summary>
-    public async Task<List<string>> GetAllowedGruppenAsync(string userName)
+    /// <summary>Vom Admin zugeordnete Gruppen (Baseline, ohne Kontext-Deaktivierung).</summary>
+    public async Task<List<string>> GetBaselineGruppenAsync(string userName)
     {
         var cfg = await LoadAsync();
         var r = cfg.Recipients.FirstOrDefault(x => string.Equals(x.UserId, userName, StringComparison.OrdinalIgnoreCase));
         return r?.AllowedGruppen ?? new List<string>();
+    }
+
+    /// <summary>
+    /// Effektive Access-Gruppen = Baseline minus die vom User deaktivierten Kontexte (Gruppen).
+    /// Diese Methode ist die zentrale Quelle für die Sichtbarkeit in allen Widgets.
+    /// </summary>
+    public async Task<List<string>> GetAllowedGruppenAsync(string userName)
+    {
+        var baseline = await GetBaselineGruppenAsync(userName);
+        if (baseline.Count == 0) return baseline;
+        var user = await _users.GetByNameAsync(userName);
+        var deaktiviert = user?.DeaktivierteKontexte ?? new List<string>();
+        if (deaktiviert.Count == 0) return baseline;
+        return baseline.Where(g => !deaktiviert.Contains(g, StringComparer.OrdinalIgnoreCase)).ToList();
     }
 
     public async Task SaveConfigAsync(WeeklyMailConfig cfg)
@@ -125,7 +139,8 @@ public class WeeklyMailService
 
             try
             {
-                var html = BuildMail(recipient, userRoles, isAdmin,
+                var effektiveGruppen = await GetAllowedGruppenAsync(recipient.UserId);
+                var html = BuildMail(recipient, userRoles, isAdmin, effektiveGruppen,
                     allTodos, allMeetings, allProjects, cutoff, baseUrl);
 
                 await _email.SendAsync(recipient.Email,
@@ -170,7 +185,8 @@ public class WeeklyMailService
         var userRoles = user?.Roles ?? new List<string>();
         var isAdmin   = userRoles.Contains("Administrator");
 
-        var html = BuildMail(recipient, userRoles, isAdmin,
+        var effektiveGruppen = await GetAllowedGruppenAsync(recipient.UserId);
+        var html = BuildMail(recipient, userRoles, isAdmin, effektiveGruppen,
             allTodos, allMeetings, allProjects, cutoff, baseUrl);
 
         // ... aber an den Admin senden (Vorschau), Betreff als Test markiert
@@ -188,6 +204,7 @@ public class WeeklyMailService
         WeeklyMailRecipient recipient,
         List<string> userRoles,
         bool isAdmin,
+        List<string> effektiveGruppen,
         List<TodoItem> allTodos,
         List<Meeting> allMeetings,
         List<Project> allProjects,
@@ -225,7 +242,7 @@ public class WeeklyMailService
         // ── Todos ─────────────────────────────────────────────────────────────
         if (recipient.ReceiveTodos)
         {
-            var todos = FilterTodos(allTodos, allProjects, recipient, userRoles, isAdmin)
+            var todos = FilterTodos(allTodos, allProjects, effektiveGruppen)
                 .Where(t => !t.Erledigt)
                 .OrderBy(t => t.ErledigenBis)
                 .ToList();
@@ -265,7 +282,7 @@ public class WeeklyMailService
         // ── Meetings ─────────────────────────────────────────────────────────
         if (recipient.ReceiveMeetings)
         {
-            var meetings = FilterMeetings(allMeetings, allProjects, recipient, userRoles, isAdmin)
+            var meetings = FilterMeetings(allMeetings, allProjects, effektiveGruppen)
                 .Where(m => m.Datum >= cutoff)
                 .OrderBy(m => m.Datum)
                 .ToList();
@@ -301,8 +318,8 @@ public class WeeklyMailService
             var journalItems = new List<(Project project, JournalEntry entry)>();
             foreach (var project in allProjects)
             {
-                // Report ist gruppen-scoped für ALLE (auch Admins): nur Journale erlaubter Gruppen.
-                if (!recipient.AllowedGruppen.Contains(project.Gruppe, StringComparer.OrdinalIgnoreCase)) continue;
+                // Report ist gruppen-scoped für ALLE (auch Admins): nur Journale der effektiven Gruppen.
+                if (!effektiveGruppen.Contains(project.Gruppe, StringComparer.OrdinalIgnoreCase)) continue;
                 foreach (var entry in project.Journal.Where(e => e.CreatedAt >= cutoff))
                     journalItems.Add((project, entry));
             }
@@ -338,36 +355,34 @@ public class WeeklyMailService
     // ── Filterlogik ───────────────────────────────────────────────────────────
 
     private List<TodoItem> FilterTodos(
-        List<TodoItem> all, List<Project> projects,
-        WeeklyMailRecipient recipient, List<string> userRoles, bool isAdmin)
+        List<TodoItem> all, List<Project> projects, List<string> effektiveGruppen)
     {
         return all.Where(t =>
         {
             if (!string.IsNullOrEmpty(t.ProjectId))
             {
                 var proj = projects.FirstOrDefault(p => p.Id == t.ProjectId);
-                return proj is not null && recipient.AllowedGruppen.Contains(proj.Gruppe, StringComparer.OrdinalIgnoreCase);
+                return proj is not null && effektiveGruppen.Contains(proj.Gruppe, StringComparer.OrdinalIgnoreCase);
             }
             if (string.IsNullOrEmpty(t.Gruppe))
                 return true;
-            return recipient.AllowedGruppen.Contains(t.Gruppe, StringComparer.OrdinalIgnoreCase);
+            return effektiveGruppen.Contains(t.Gruppe, StringComparer.OrdinalIgnoreCase);
         }).ToList();
     }
 
     private List<Meeting> FilterMeetings(
-        List<Meeting> all, List<Project> projects,
-        WeeklyMailRecipient recipient, List<string> userRoles, bool isAdmin)
+        List<Meeting> all, List<Project> projects, List<string> effektiveGruppen)
     {
         return all.Where(m =>
         {
             if (!string.IsNullOrEmpty(m.ProjectId))
             {
                 var proj = projects.FirstOrDefault(p => p.Id == m.ProjectId);
-                return proj is not null && recipient.AllowedGruppen.Contains(proj.Gruppe, StringComparer.OrdinalIgnoreCase);
+                return proj is not null && effektiveGruppen.Contains(proj.Gruppe, StringComparer.OrdinalIgnoreCase);
             }
             if (string.IsNullOrEmpty(m.Gruppe))
                 return true;
-            return recipient.AllowedGruppen.Contains(m.Gruppe, StringComparer.OrdinalIgnoreCase);
+            return effektiveGruppen.Contains(m.Gruppe, StringComparer.OrdinalIgnoreCase);
         }).ToList();
     }
 

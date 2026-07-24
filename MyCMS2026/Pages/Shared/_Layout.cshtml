@@ -159,6 +159,7 @@
                                     <li><a class="dropdown-item" asp-page="/Admin/SiteConfig"><i class="bi bi-sliders me-1"></i>Site-Konfiguration</a></li>
                                     <li><a class="dropdown-item" asp-page="/Admin/Klassen"><i class="bi bi-tags me-1"></i>Klassen</a></li>
                                     <li><a class="dropdown-item" asp-page="/Admin/Gruppen"><i class="bi bi-collection me-1"></i>Gruppen</a></li>
+                                    <li><a class="dropdown-item" asp-page="/Admin/Kontext"><i class="bi bi-diagram-3 me-1"></i>Kontext</a></li>
                                     <li><a class="dropdown-item" asp-page="/Admin/WeeklyMail"><i class="bi bi-envelope-paper me-1"></i>Access &amp; Report Settings</a></li>
                                     <li><a class="dropdown-item" asp-page="/Admin/Activity"><i class="bi bi-activity me-1"></i>Aktivitätslog</a></li>
                                 </ul>
@@ -313,6 +314,11 @@
                        asp-page="/Admin/Gruppen">
                         <i class="bi bi-collection cms-nav-icon"></i>
                         Gruppen
+                    </a>
+                    <a class="cms-nav-item @(currentPath.StartsWith("/admin/kontext") ? "active" : "")"
+                       asp-page="/Admin/Kontext">
+                        <i class="bi bi-diagram-3 cms-nav-icon"></i>
+                        Kontext
                     </a>
                     <a class="cms-nav-item @(currentPath.StartsWith("/admin/weeklymail") ? "active" : "")"
                        asp-page="/Admin/WeeklyMail">

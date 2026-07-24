@@ -10,11 +10,8 @@
     var userName = User.Identity?.Name ?? "";
     var isAdmin  = User.IsInRole("Administrator");
 
-    // Gruppen des Benutzers aus Reporting Settings
-    var config         = await WeeklyMailSvc.GetConfigAsync();
-    var recipient      = config.Recipients.FirstOrDefault(r =>
-        string.Equals(r.UserId, userName, StringComparison.OrdinalIgnoreCase));
-    var allowedGruppen = recipient?.AllowedGruppen ?? new List<string>();
+    // Effektive Access-Gruppen des Users (Baseline minus deaktivierte Kontexte)
+    var allowedGruppen = await WeeklyMailSvc.GetAllowedGruppenAsync(userName);
     var filterByGroup  = allowedGruppen.Any();
 
     // Alle Daten laden

@@ -18,10 +18,8 @@
     var search = Context.Request.Query["search"].ToString();
     var klasse = Context.Request.Query["klasse"].ToString();
 
-    // Access-Gruppen des Users (Sichtbarkeits-Gate; ConfigString verengt zusätzlich)
-    var cfg            = await WeeklyMailSvc.GetConfigAsync();
-    var recipient      = cfg.Recipients.FirstOrDefault(r => string.Equals(r.UserId, userName, StringComparison.OrdinalIgnoreCase));
-    var allowedGruppen = recipient?.AllowedGruppen ?? new List<string>();
+    // Effektive Access-Gruppen des Users (Baseline minus deaktivierte Kontexte); ConfigString verengt zusätzlich
+    var allowedGruppen = await WeeklyMailSvc.GetAllowedGruppenAsync(userName);
     bool CanSeeGr(string? g)
     {
         if (isAdmin) return string.IsNullOrWhiteSpace(gruppe) || string.Equals(g, gruppe, StringComparison.OrdinalIgnoreCase);
@@ -109,7 +107,6 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <form method="post" asp-page="/Downloads/Index" asp-page-handler="Update">
-                    <input type="hidden" name="gruppe" value="@gruppe" />
                     <input type="hidden" name="navItemId" value="@pageId" />
                     <input type="hidden" name="id" id="wDlEditId" />
                     <div class="modal-header card-header-cms rounded-0">
@@ -117,6 +114,15 @@
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Gruppe <span class="text-danger">*</span></label>
+                            <select name="gruppe" id="wDlEditGruppe" class="form-select" required>
+                                @foreach (var g in (isAdmin ? alleGruppen : allowedGruppen))
+                                {
+                                    <option value="@g">@g</option>
+                                }
+                            </select>
+                        </div>
                         <div class="mb-3">
                             <label class="form-label">Beschreibung</label>
                             <input name="beschreibung" id="wDlEditBeschreibung" class="form-control" />
@@ -181,6 +187,7 @@
                 <th style="max-width:130px">Beschreibung</th>
                 <th style="max-width:200px">Dateiname</th>
                 <th>Klasse</th>
+                <th>Gruppe</th>
                 <th>Erstellt</th>
                 <th>Grösse</th>
                 <th class="text-end">Aktionen</th>
@@ -212,6 +219,12 @@
                         <span class="badge bg-light text-dark border">@d.Klasse</span>
                     }
                 </td>
+                <td>
+                    @if (!string.IsNullOrEmpty(d.Gruppe))
+                    {
+                        <span class="badge bg-light text-dark border"><i class="bi bi-people me-1"></i>@d.Gruppe</span>
+                    }
+                </td>
                 <td class="text-muted small text-nowrap">@d.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")</td>
                 <td class="text-muted small text-nowrap">@(d.Size / 1024) KB</td>
                 <td class="text-end text-nowrap">
@@ -222,7 +235,7 @@
                     @if (canEdit)
                     {
                         <button type="button" class="btn btn-sm btn-outline-secondary" title="Bearbeiten"
-                                onclick="wDlOpenEdit('@d.Id', '@d.Beschreibung.Replace("'", "\\'")', '@d.Klasse')">
+                                onclick="wDlOpenEdit('@d.Id', '@d.Beschreibung.Replace("'", "\\'")', '@d.Klasse', '@d.Gruppe')">
                             <i class="bi bi-pencil"></i>
                         </button>
                         <form method="post" asp-page="/Downloads/Index" asp-page-handler="Delete" class="d-inline">
@@ -240,7 +253,7 @@
 }
             @if (!all.Any())
             {
-                <tr><td colspan="6" class="text-center text-muted py-3">Keine Dateien vorhanden.</td></tr>
+                <tr><td colspan="7" class="text-center text-muted py-3">Keine Dateien vorhanden.</td></tr>
             }
         </tbody>
     </table>
@@ -249,12 +262,18 @@
 @if (canEdit)
 {
     <script>
-    function wDlOpenEdit(id, beschreibung, klasse) {
+    function wDlOpenEdit(id, beschreibung, klasse, gruppe) {
         document.getElementById('wDlEditId').value = id;
         document.getElementById('wDlEditBeschreibung').value = beschreibung;
         var sel = document.getElementById('wDlEditKlasse');
         for (var i = 0; i < sel.options.length; i++) {
             sel.options[i].selected = (sel.options[i].value === klasse);
+        }
+        var gsel = document.getElementById('wDlEditGruppe');
+        if (gsel) {
+            for (var j = 0; j < gsel.options.length; j++) {
+                gsel.options[j].selected = (gsel.options[j].value === gruppe);
+            }
         }
         new bootstrap.Modal(document.getElementById('wDlEditModal')).show();
     }

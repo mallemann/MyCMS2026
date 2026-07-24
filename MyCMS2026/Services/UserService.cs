@@ -18,12 +18,14 @@ public class UserService
     private readonly string _usersFile;
     private readonly SemaphoreSlim _lock = new(1, 1);
     private List<AppUser>? _cache;
+    private readonly KontextService _kontext;
 
-    public UserService(IWebHostEnvironment env)
+    public UserService(IWebHostEnvironment env, KontextService kontext)
     {
         var dataDir = Path.Combine(env.ContentRootPath, "App_Data");
         Directory.CreateDirectory(dataDir);
         _usersFile = Path.Combine(dataDir, "users.json");
+        _kontext = kontext;
         EnsureDefaultAdmin();
     }
 
@@ -247,7 +249,7 @@ public class UserService
         return true;
     }
 
-    public ClaimsPrincipal BuildPrincipal(AppUser user)
+    private static ClaimsPrincipal BuildFromRoles(AppUser user, IEnumerable<string> roles)
     {
         var claims = new List<Claim>
         {
@@ -255,11 +257,56 @@ public class UserService
             new(ClaimTypes.Email, user.Email),
             new("Kuerzel", user.Kuerzel)
         };
-        foreach (var role in user.Roles)
+        foreach (var role in roles)
             claims.Add(new Claim(ClaimTypes.Role, role));
 
         var identity = new ClaimsIdentity(claims, "MyCMSCookies");
         return new ClaimsPrincipal(identity);
+    }
+
+    /// <summary>Rohe Rollen (Admin-Grant), ohne Kontext-Deaktivierung.</summary>
+    public ClaimsPrincipal BuildPrincipal(AppUser user) => BuildFromRoles(user, user.Roles);
+
+    /// <summary>Principal mit EFFEKTIVEN Rollen (deaktivierte Kontexte herausgerechnet). Für Login und Re-SignIn.</summary>
+    public async Task<ClaimsPrincipal> BuildPrincipalAsync(AppUser user)
+        => BuildFromRoles(user, await GetEffectiveRolesAsync(user));
+
+    /// <summary>
+    /// Effektive Rollen = Rollen minus Rollen deaktivierter Kontexte – aber nur, wenn kein aktiver
+    /// (nicht deaktivierter) Kontext dieselbe Rolle noch benötigt.
+    /// </summary>
+    public async Task<List<string>> GetEffectiveRolesAsync(AppUser user)
+    {
+        if (user.DeaktivierteKontexte == null || user.DeaktivierteKontexte.Count == 0)
+            return user.Roles.ToList();
+
+        var kontexte    = await _kontext.GetAllAsync();
+        var deaktiviert = user.DeaktivierteKontexte;
+
+        var rollenAktiv = kontexte
+            .Where(k => !deaktiviert.Contains(k.Gruppe, StringComparer.OrdinalIgnoreCase))
+            .Select(k => k.Rolle)
+            .Where(r => !string.IsNullOrEmpty(r))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var entfernen = kontexte
+            .Where(k => deaktiviert.Contains(k.Gruppe, StringComparer.OrdinalIgnoreCase))
+            .Select(k => k.Rolle)
+            .Where(r => !string.IsNullOrEmpty(r) && !rollenAktiv.Contains(r))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return user.Roles.Where(r => !entfernen.Contains(r)).ToList();
+    }
+
+    /// <summary>Setzt die vom User deaktivierten Kontexte (Gruppen) und gibt den aktualisierten User zurück.</summary>
+    public async Task<AppUser?> SetDeaktivierteKontexteAsync(string userName, List<string> deaktiviert)
+    {
+        var users = await LoadAsync();
+        var user = users.FirstOrDefault(u => u.UserName.Equals(userName, StringComparison.OrdinalIgnoreCase));
+        if (user == null) return null;
+        user.DeaktivierteKontexte = deaktiviert ?? new List<string>();
+        await SaveAsync(users);
+        return user;
     }
 
     public List<string> AvailableRoles => new() { "Administrator", "Member", "Guest" };

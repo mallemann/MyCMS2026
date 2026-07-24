@@ -1,0 +1,74 @@
+@page
+@model MyCMS2026.Pages.Admin.KontextModel
+@{
+    ViewData["Title"] = "Kontext";
+}
+<div>
+    <div class="cms-page-header d-flex justify-content-between align-items-center">
+        <h1 class="cms-page-title"><i class="bi bi-diagram-3 me-2 fs-4"></i>Kontext</h1>
+    </div>
+    <div class="cms-page-body">
+
+    @if (!string.IsNullOrEmpty(Model.Message))
+    {
+        <div class="alert alert-success alert-dismissible">
+            @Model.Message
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <p class="text-muted small">
+        Ein Kontext verknüpft eine Gruppe mit ihrer primären Sichtbarkeitsrolle (typischerweise die Rolle
+        des obersten Navigationsknotens dieser Gruppe). User können in ihren Einstellungen einzelne Kontexte
+        ein-/ausschalten.
+    </p>
+
+    <form method="post" asp-page-handler="Save">
+        <div class="table-responsive">
+            <table class="table table-bordered table-sm align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width:200px">Gruppe</th>
+                        <th style="width:260px">Primäre Sichtbarkeitsrolle</th>
+                        <th>Beschreibung</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var g in Model.AllGruppen)
+                {
+                    var curRole = Model.RolleFor(g);
+                    <tr>
+                        <td class="fw-semibold">
+                            @g
+                            <input type="hidden" name="gruppe" value="@g" />
+                        </td>
+                        <td>
+                            <select name="rolle" class="form-select form-select-sm">
+                                <option value="">– keine –</option>
+                                @foreach (var r in Model.AllRoles)
+                                {
+                                    <option value="@r" selected="@(r == curRole ? "selected" : null)">@r</option>
+                                }
+                            </select>
+                        </td>
+                        <td>
+                            <input name="beschreibung" class="form-control form-control-sm"
+                                   value="@Model.BeschreibungFor(g)" />
+                        </td>
+                    </tr>
+                }
+                @if (!Model.AllGruppen.Any())
+                {
+                    <tr><td colspan="3" class="text-center text-muted py-3">Keine Gruppen vorhanden. Zuerst unter «Gruppen» anlegen.</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+
+        <button type="submit" class="btn btn-cms">
+            <i class="bi bi-floppy me-1"></i>Speichern
+        </button>
+    </form>
+
+    </div>
+</div>

@@ -14,10 +14,8 @@
     // Reporting-Filter
     var userName       = User.Identity?.Name ?? "";
     var isAdmin        = User.IsInRole("Administrator");
-    var wmConfig       = await WeeklyMailSvc.GetConfigAsync();
-    var recipient      = wmConfig.Recipients.FirstOrDefault(r =>
-        string.Equals(r.UserId, userName, StringComparison.OrdinalIgnoreCase));
-    var allowedGruppen = recipient?.AllowedGruppen ?? new List<string>();
+    // Effektive Access-Gruppen des Users (Baseline minus deaktivierte Kontexte)
+    var allowedGruppen = await WeeklyMailSvc.GetAllowedGruppenAsync(userName);
     var filterByGroup  = allowedGruppen.Any();
 
     bool InGroup(string? g) =>

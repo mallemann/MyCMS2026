@@ -86,13 +86,14 @@ public class DownloadService
         return item;
     }
 
-    public async Task<bool> UpdateAsync(string id, string beschreibung, string klasse)
+    public async Task<bool> UpdateAsync(string id, string beschreibung, string klasse, string? gruppe = null)
     {
         var items = await LoadAsync();
         var item = items.FirstOrDefault(d => d.Id == id);
         if (item == null) return false;
         item.Beschreibung = beschreibung;
         item.Klasse = klasse;
+        if (!string.IsNullOrWhiteSpace(gruppe)) item.Gruppe = gruppe;
         await SaveAsync(items);
         return true;
     }

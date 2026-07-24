@@ -18,4 +18,8 @@ public class AppUser
     // Brute-Force-Schutz: Fehlversuche zählen und Konto temporär sperren.
     public int AccessFailedCount { get; set; }
     public DateTime? LockoutEnd { get; set; }
+
+    // Kontext-Feature: Gruppen (= Kontexte), die der User in seinen Einstellungen deaktiviert hat.
+    // Nicht-destruktiv: der Admin-Grant (Roles + AllowedGruppen) bleibt die Obergrenze.
+    public List<string> DeaktivierteKontexte { get; set; } = new();
 }

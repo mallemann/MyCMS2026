@@ -10,10 +10,7 @@
 
     // Gruppen des aktuellen Benutzers aus Reporting Settings
     var okrUserName  = User.Identity?.Name ?? "";
-    var okrConfig    = await WeeklyMailSvc.GetConfigAsync();
-    var okrRecipient = okrConfig.Recipients.FirstOrDefault(r =>
-        string.Equals(r.UserId, okrUserName, StringComparison.OrdinalIgnoreCase));
-    var okrAllowedGruppen = okrRecipient?.AllowedGruppen ?? new List<string>();
+    var okrAllowedGruppen = await WeeklyMailSvc.GetAllowedGruppenAsync(okrUserName);
     var okrFilterByGroup  = okrAllowedGruppen.Any();
 
     // Gruppen-Liste für Admin-Dropdowns
