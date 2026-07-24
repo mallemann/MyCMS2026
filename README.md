@@ -1,5 +1,7 @@
 # MyCMS2026
 
+![MyCMS2026 Dashboard](docs/TopIMG.png)
+
 Ein schlankes, self-hosted Content-Management- und Team-Workspace-System auf Basis von **ASP.NET Core 8 / Razor Pages**. MyCMS2026 kombiniert klassische CMS-Funktionen (verwaltbare HTML-Seiten, Navigation, Bild-Uploads) mit einem geschützten internen Arbeitsbereich für Meetings, Projekte, Aufgaben, OKRs und Dokumenten-Ablage.
 
 Die Datenhaltung erfolgt **dateibasiert über JSON** – es wird keine Datenbank benötigt. Das macht das System leichtgewichtig, portabel und einfach zu deployen.
