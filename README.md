@@ -62,7 +62,15 @@ Die Datenhaltung erfolgt **dateibasiert über JSON** – es wird keine Datenbank
 
 ---
 
-## Schnellstart
+## Nur installieren statt bauen?
+
+Wer MyCMS2026 nur betreiben und nicht selbst kompilieren möchte, nutzt das fertige Deployment-Repository:
+
+**→ [mallemann/mycms2026-deploy-template](https://github.com/mallemann/mycms2026-deploy-template)** – eine leere, kompilierte MyCMS-Instanz. Beim Setup lassen sich bei Bedarf Demodaten mitinstallieren.
+
+Dieses Repository hier (Quellcode) ist für Entwicklung, Anpassung und eigene Builds gedacht.
+
+## Schnellstart (aus dem Quellcode)
 
 ```bash
 # Repository klonen
@@ -156,4 +164,8 @@ Beim Publish werden Laufzeitdaten und `appsettings.Production.json` bewusst ausg
 
 ## Lizenz
 
-Noch keine Lizenz festgelegt. Ohne Lizenzangabe gelten die Standard-Urheberrechte – bitte vor öffentlicher Nutzung eine Lizenz (z. B. MIT) ergänzen.
+Lizenziert unter der **[PolyForm Noncommercial License 1.0.0](LICENSE.md)**.
+
+Kurz gesagt: Jeder darf MyCMS2026 frei nutzen, verändern und weitergeben – für **nicht-kommerzielle** Zwecke (Hobby, Studium, private Nutzung, gemeinnützige und öffentliche Organisationen). **Nicht erlaubt** ist die kommerzielle Verwertung, insbesondere das Weiterverkaufen der Software. Für kommerzielle Nutzung bitte den Autor kontaktieren.
+
+Copyright © 2026 Martin Allemann
