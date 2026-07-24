@@ -72,7 +72,9 @@ public class OkrIndexModel : PageModel
     public async Task<IActionResult> OnPostAddObjectiveAsync(string text, int year, string? gruppe, string? returnPageId)
     {
         if (!User.IsInRole("Administrator")) return Forbid();
-        await _okr.CreateObjectiveAsync(new OkrObjective { Text = text, Year = year, Status = "aktiv", Gruppe = gruppe ?? "" });
+        // Gruppe ist Pflicht (scoped Widget liefert sie, unscoped muss gewählt werden)
+        if (string.IsNullOrWhiteSpace(gruppe)) return RedirectBack(returnPageId, year);
+        await _okr.CreateObjectiveAsync(new OkrObjective { Text = text, Year = year, Status = "aktiv", Gruppe = gruppe });
         return RedirectBack(returnPageId, year);
     }
 

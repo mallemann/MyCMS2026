@@ -2,11 +2,16 @@
 @model MyCMS2026.Pages.Meetings.MeetingEditModel
 @inject MyCMS2026.Services.KlassenService KlassenSvc
 @inject MyCMS2026.Services.GruppenService GruppenSvc
+@inject MyCMS2026.Services.WeeklyMailService WeeklyMailSvc
 @{
     ViewData["Title"] = string.IsNullOrEmpty(Model.Meeting.Id) ? "Neues Meeting" : "Meeting bearbeiten";
     var isNew = string.IsNullOrEmpty(Model.Meeting.Id);
     var meetingKlassen = await KlassenSvc.GetKlassenAsync("meetings");
     var alleGruppen = await GruppenSvc.GetAllAsync();
+    var isAdmin = User.IsInRole("Administrator");
+    var allowedGruppen = await WeeklyMailSvc.GetAllowedGruppenAsync(User.Identity?.Name ?? "");
+    // Freie Gruppenwahl nur beim Neuanlegen ohne vorgegebene Gruppe (unscoped Widget, kein Projekt)
+    var gruppeFreiWaehlbar = isNew && string.IsNullOrEmpty(Model.Meeting.Gruppe);
 }
 
 <div>
@@ -101,12 +106,25 @@
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label fw-semibold">Gruppe</label>
-                    <input type="hidden" asp-for="Meeting.Gruppe" />
-                    <input class="form-control" value="@(Model.Meeting.Gruppe ?? "")" readonly />
-                    @if (!string.IsNullOrEmpty(Model.ProjectGruppe))
+                    <label class="form-label fw-semibold">Gruppe @if (gruppeFreiWaehlbar) {<span class="text-danger">*</span>}</label>
+                    @if (gruppeFreiWaehlbar)
                     {
-                        <div class="form-text text-muted"><i class="bi bi-lock me-1"></i>Vom Projekt vorgegeben</div>
+                        <select asp-for="Meeting.Gruppe" class="form-select" required>
+                            <option value="">– Gruppe wählen –</option>
+                            @foreach (var g in (isAdmin ? alleGruppen : allowedGruppen))
+                            {
+                                <option value="@g">@g</option>
+                            }
+                        </select>
+                    }
+                    else
+                    {
+                        <input type="hidden" asp-for="Meeting.Gruppe" />
+                        <input class="form-control" value="@(Model.Meeting.Gruppe ?? "")" readonly />
+                        @if (!string.IsNullOrEmpty(Model.ProjectGruppe))
+                        {
+                            <div class="form-text text-muted"><i class="bi bi-lock me-1"></i>Vom Projekt vorgegeben</div>
+                        }
                     }
                 </div>
                 <div class="col-md-6">

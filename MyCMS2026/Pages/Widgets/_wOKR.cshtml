@@ -30,23 +30,25 @@
     var showAll  = Context.Request.Query["showAll"].ToString() == "true";
     var all      = await OkrSvc.GetByYearAsync(currentYear);
 
-    // Sichtbarkeit nach Reporting-Gruppen (analog Dashboard/Timeline/ToDos/Meetings)
-    if (isAdmin && !okrFilterByGroup)
+    // Sichtbarkeit: Access-Gruppen (welche Daten) + ConfigString verengt auf eine Gruppe
+    var okrGruppe = Model.NavItem?.ConfigString ?? "";
+    bool CanSeeGr(string? g)
     {
-        // Admin ohne Gruppen-Zuordnung → alles
+        if (isAdmin) return string.IsNullOrWhiteSpace(okrGruppe) || string.Equals(g, okrGruppe, StringComparison.OrdinalIgnoreCase);
+        if (!okrAllowedGruppen.Any()) return false;
+        if (!string.IsNullOrWhiteSpace(okrGruppe))
+            return string.Equals(g, okrGruppe, StringComparison.OrdinalIgnoreCase) && okrAllowedGruppen.Contains(g, StringComparer.OrdinalIgnoreCase);
+        return !string.IsNullOrEmpty(g) && okrAllowedGruppen.Contains(g, StringComparer.OrdinalIgnoreCase);
     }
-    else if (okrFilterByGroup)
-    {
-        all = all.Where(o =>
-            string.IsNullOrEmpty(o.Gruppe) ||
-            okrAllowedGruppen.Contains(o.Gruppe, StringComparer.OrdinalIgnoreCase)).ToList();
-    }
-    else
-    {
-        all = new List<MyCMS2026.Models.OkrObjective>();
-    }
+    all = all.Where(o => CanSeeGr(o.Gruppe)).ToList();
 
     var objectives = showAll ? all : all.Where(o => o.Status == "aktiv").ToList();
+}
+
+@if (!isAdmin && !okrAllowedGruppen.Any())
+{
+    <div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-2"></i>Sie sind keiner Gruppe zugeordnet – bitte Administrator kontaktieren.</div>
+    return;
 }
 
 @* Jahr-Navigation + Filter *@
@@ -259,13 +261,21 @@
                             </div>
                             <div class="col-6">
                                 <label class="form-label fw-semibold">Gruppe</label>
-                                <select name="gruppe" class="form-select">
-                                    <option value="">– für alle sichtbar –</option>
-                                    @foreach (var g in alleGruppen)
-                                    {
-                                        <option value="@g">@g</option>
-                                    }
-                                </select>
+                                @if (!string.IsNullOrWhiteSpace(okrGruppe))
+                                {
+                                    <input type="text" class="form-control" value="@okrGruppe" readonly />
+                                    <input type="hidden" name="gruppe" value="@okrGruppe" />
+                                }
+                                else
+                                {
+                                    <select name="gruppe" class="form-select" required>
+                                        <option value="">– Gruppe wählen –</option>
+                                        @foreach (var g in alleGruppen)
+                                        {
+                                            <option value="@g">@g</option>
+                                        }
+                                    </select>
+                                }
                             </div>
                         </div>
                     </div>

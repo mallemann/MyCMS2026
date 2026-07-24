@@ -78,12 +78,12 @@
     bool AllowGruppe(string? gruppe)
     {
         if (isAdmin) return true;
-        if (string.IsNullOrEmpty(gruppe)) return true;
-        if (!allowedGruppen.Any()) return true;   // kein Recipient konfiguriert → alles zeigen
+        if (!allowedGruppen.Any()) return false;         // keine Gruppen zugeordnet → nichts
+        if (string.IsNullOrEmpty(gruppe)) return false;  // gruppenlose Daten nur für Admin
         return allowedGruppen.Contains(gruppe, StringComparer.OrdinalIgnoreCase);
     }
 
-    bool AllowProject(Project p) => isAdmin || ProjectSvc.CanRead(p, isAdmin, userRoles);
+    bool AllowProject(Project p) => ProjectSvc.CanRead(p, isAdmin, allowedGruppen);
 
     // ── Suchergebnisse ───────────────────────────────────────────────────────
     var todoResults    = new List<TodoItem>();

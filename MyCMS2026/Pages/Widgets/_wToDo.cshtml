@@ -3,6 +3,7 @@
 @using MyCMS2026.Models
 @inject TodoService TodoSvc
 @inject MyCMS2026.Services.KlassenService KlassenSvc
+@inject WeeklyMailService WeeklyMailSvc
 @{
     var isAdmin       = User.IsInRole("Administrator");
     var currentKuerzel = User.FindFirst("Kuerzel")?.Value ?? "";
@@ -17,9 +18,21 @@
     var meine    = Context.Request.Query["meine"].ToString() == "1";
     var userName = User.Identity?.Name ?? "";
 
+    // Access-Gruppen des Users (Sichtbarkeits-Gate; ConfigString verengt zusätzlich)
+    var cfg            = await WeeklyMailSvc.GetConfigAsync();
+    var recipient      = cfg.Recipients.FirstOrDefault(r => string.Equals(r.UserId, userName, StringComparison.OrdinalIgnoreCase));
+    var allowedGruppen = recipient?.AllowedGruppen ?? new List<string>();
+    bool CanSeeGr(string? g)
+    {
+        if (isAdmin) return string.IsNullOrWhiteSpace(gruppe) || string.Equals(g, gruppe, StringComparison.OrdinalIgnoreCase);
+        if (!allowedGruppen.Any()) return false;
+        if (!string.IsNullOrWhiteSpace(gruppe))
+            return string.Equals(g, gruppe, StringComparison.OrdinalIgnoreCase) && allowedGruppen.Contains(g, StringComparer.OrdinalIgnoreCase);
+        return !string.IsNullOrEmpty(g) && allowedGruppen.Contains(g, StringComparer.OrdinalIgnoreCase);
+    }
+
     var all = await TodoSvc.GetAllAsync();
-    if (!string.IsNullOrWhiteSpace(gruppe))
-        all = all.Where(t => t.Gruppe == gruppe).ToList();
+    all = all.Where(t => CanSeeGr(t.Gruppe)).ToList();
     if (!string.IsNullOrWhiteSpace(search))
         all = all.Where(t => t.Thema.Contains(search, StringComparison.OrdinalIgnoreCase) ||
                               t.Verantwortlich.Contains(search, StringComparison.OrdinalIgnoreCase)).ToList();
@@ -32,6 +45,12 @@
 
     int offene  = all.Count(t => !t.Erledigt);
     int overdue = all.Count(t => !t.Erledigt && t.ErledigenBis < DateTime.Today);
+}
+
+@if (!isAdmin && !allowedGruppen.Any())
+{
+    <div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-2"></i>Sie sind keiner Gruppe zugeordnet – bitte Administrator kontaktieren.</div>
+    return;
 }
 
 @* Delete-Forms ausserhalb der Tabelle *@

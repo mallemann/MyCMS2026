@@ -1,26 +1,28 @@
 @model MyCMS2026.Pages.Page.PageIndexModel
 @inject MyCMS2026.Services.ProjectService ProjectSvc
+@inject MyCMS2026.Services.WeeklyMailService WeeklyMailSvc
 @*
     Widget: wProjects
-      ConfigString leer     → alle sichtbaren Projekte; Neuanlage mit freier Gruppenwahl (Admin)
+      ConfigString leer     → alle sichtbaren Projekte (Access-Gruppen des Users)
       ConfigString = Gruppe → nur Projekte dieser Gruppe; Neuanlage zwingend dieser Gruppe zugeordnet
+    Lesen = Access-Gruppen (welche Projekte), Bearbeiten = Bearbeiten-Rolle des Widgets.
 *@
 @{
     var configString = Model.NavItem?.ConfigString ?? "";
     var isAdmin      = User.IsInRole("Administrator");
     var canCreate    = isAdmin || Model.HasExtendedAccess;
     var pageId       = Model.Id;
+    var userName     = User.Identity?.Name ?? "";
     var userRoles    = User.Claims
         .Where(c => c.Type == System.Security.Claims.ClaimTypes.Role)
         .Select(c => c.Value).ToList();
 
-    var projects = await ProjectSvc.GetVisibleAsync(isAdmin, userRoles);
+    var allowedGruppen = await WeeklyMailSvc.GetAllowedGruppenAsync(userName);
+
+    var projects = await ProjectSvc.GetVisibleAsync(isAdmin, allowedGruppen);
     // Gruppen-Scope: wenn ConfigString eine Gruppe enthält, nur Projekte dieser Gruppe
     if (!string.IsNullOrWhiteSpace(configString))
         projects = projects.Where(p => string.Equals(p.Gruppe, configString, StringComparison.OrdinalIgnoreCase)).ToList();
-
-    var aktiv = projects.Where(p => p.Status != "Abgeschlossen").ToList();
-    var done  = projects.Where(p => p.Status == "Abgeschlossen").ToList();
 }
 
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -39,6 +41,12 @@
     }
 </div>
 
+@if (!isAdmin && !allowedGruppen.Any())
+{
+    <div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-2"></i>Sie sind keiner Gruppe zugeordnet – bitte Administrator kontaktieren.</div>
+    return;
+}
+
 @if (!projects.Any())
 {
     <div class="text-center py-4 text-muted small">
@@ -47,74 +55,58 @@
 }
 else
 {
-    @* Delete-Forms ausserhalb der Karten *@
-    @if (isAdmin)
-    {
-        @foreach (var p in projects)
-        {
-            <form id="delProj-@p.Id" method="post" action="/Projects/Index?handler=Delete" style="display:none">
-                <input type="hidden" name="id" value="@p.Id" />
-                @Html.AntiForgeryToken()
-            </form>
-        }
-    }
-
-    @foreach (var p in aktiv)
-    {
-        <div class="card mb-2">
-            <div class="card-body py-2 d-flex justify-content-between align-items-center">
-                <div>
-                    <a asp-page="/Projects/Detail" asp-route-id="@p.Id" class="fw-semibold text-decoration-none">
-                        @p.Name
-                    </a>
-                    @if (!string.IsNullOrEmpty(p.Projektleiter))
-                    {
-                        <span class="text-muted small ms-2">@p.Projektleiter</span>
-                    }
-                </div>
-                <div class="d-flex align-items-center gap-2">
-                    <span class="badge @(p.Status == "Aktiv" ? "bg-success" : "bg-warning text-dark")">@p.Status</span>
-                    @if (p.Journal.Any())
-                    {
-                        <span class="small text-muted"><i class="bi bi-journal-text"></i> @p.Journal.Count</span>
-                    }
-                    @if (ProjectSvc.CanEdit(p, isAdmin, userRoles))
-                    {
-                        <a asp-page="/Projects/Edit" asp-route-id="@p.Id" class="btn btn-sm btn-outline-secondary" title="Bearbeiten">
-                            <i class="bi bi-pencil"></i>
+    <div class="table-responsive">
+        <table class="table table-hover table-sm align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Projekt</th>
+                    <th>Projektleiter</th>
+                    <th>Status</th>
+                    <th class="text-center">Journal</th>
+                    <th class="text-end">Aktionen</th>
+                </tr>
+            </thead>
+            <tbody>
+@foreach (var p in projects)
+{
+    string statusBadge = p.Status == "Aktiv" ? "bg-success"
+        : p.Status == "Abgeschlossen" ? "bg-secondary" : "bg-warning text-dark";
+                <tr>
+                    <td>
+                        <a asp-page="/Projects/Detail" asp-route-id="@p.Id" class="fw-semibold text-decoration-none">@p.Name</a>
+                    </td>
+                    <td class="text-muted small">@(string.IsNullOrEmpty(p.Projektleiter) ? "–" : p.Projektleiter)</td>
+                    <td><span class="badge @statusBadge">@p.Status</span></td>
+                    <td class="text-center text-muted small">
+                        @if (p.Journal.Any()) { <span><i class="bi bi-journal-text"></i> @p.Journal.Count</span> } else { <span>–</span> }
+                    </td>
+                    <td class="text-end text-nowrap">
+                        <a asp-page="/Projects/Detail" asp-route-id="@p.Id" class="btn btn-sm btn-outline-primary" title="Öffnen">
+                            <i class="bi bi-eye"></i>
                         </a>
-                    }
-                    @if (isAdmin)
-                    {
-                        <button type="button" class="btn btn-sm btn-outline-danger" title="Löschen"
-                                onclick="cmsConfirmDelete('delProj-@p.Id', 'Projekt «@p.Name.Replace("'", "\\'")» wirklich löschen?')">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    }
-                </div>
-            </div>
-        </div>
-    }
-    @if (done.Any())
-    {
-        <div class="text-muted small mt-2 mb-1">Abgeschlossen</div>
-        @foreach (var p in done)
-        {
-            <div class="d-flex justify-content-between align-items-center py-1 border-bottom opacity-75">
-                <a asp-page="/Projects/Detail" asp-route-id="@p.Id" class="text-decoration-none text-muted small">
-                    @p.Name
-                </a>
-                <div class="d-flex align-items-center gap-2">
-                    <span class="badge bg-secondary">Abgeschlossen</span>
-                    @if (isAdmin)
-                    {
-                        <button type="button" class="btn btn-sm btn-outline-danger btn-sm" title="Löschen"
-                                onclick="cmsConfirmDelete('delProj-@p.Id', 'Projekt «@p.Name.Replace("'", "\\'")» wirklich löschen?')">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    }
-                </div>
-            </div>
-        }
-    }
+                        @if (ProjectSvc.CanEdit(p, isAdmin, userRoles))
+                        {
+                            <a asp-page="/Projects/Edit" asp-route-id="@p.Id" asp-route-returnPageId="@pageId"
+                               class="btn btn-sm btn-outline-secondary" title="Bearbeiten">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                        }
+                        @if (isAdmin)
+                        {
+                            <form method="post" action="/Projects/Edit?handler=Delete" class="d-inline">
+                                <input type="hidden" name="id" value="@p.Id" />
+                                <input type="hidden" name="returnPageId" value="@pageId" />
+                                @Html.AntiForgeryToken()
+                                <button type="button" class="btn btn-sm btn-outline-danger" title="Löschen"
+                                        onclick="cmsConfirmDelete(this.closest('form'), 'Projekt «@p.Name.Replace("'", "\\'")» wirklich löschen?')">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+}
+            </tbody>
+        </table>
+    </div>
 }

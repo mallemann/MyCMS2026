@@ -1,11 +1,11 @@
 @page
 @model MyCMS2026.Pages.Admin.WeeklyMailModel
 @{
-    ViewData["Title"] = "Reporting Settings";
+    ViewData["Title"] = "Access & Report Settings";
 }
 <div>
     <div class="cms-page-header d-flex justify-content-between align-items-center">
-        <h1 class="cms-page-title"><i class="bi bi-envelope-paper me-2 fs-4"></i>Reporting Settings</h1>
+        <h1 class="cms-page-title"><i class="bi bi-envelope-paper me-2 fs-4"></i>Access &amp; Report Settings</h1>
         <form method="post" asp-page-handler="SendNow" class="d-inline">
             <button type="submit" class="btn btn-cms btn-sm">
                 <i class="bi bi-send me-1"></i>Jetzt senden
@@ -88,7 +88,16 @@
                                 }
                             </div>
                         </td>
-                        <td>
+                        <td class="text-nowrap">
+                            @if (!string.IsNullOrEmpty(r.UserId))
+                            {
+                                <button type="submit" formaction="?handler=SendToUser" formnovalidate
+                                        name="userId" value="@r.UserId"
+                                        class="btn btn-outline-primary btn-sm"
+                                        title="Test-Weekly dieses Benutzers als Vorschau an mich (Admin) senden">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            }
                             <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeRow(this)">
                                 <i class="bi bi-trash"></i>
                             </button>

@@ -64,11 +64,22 @@ public class DownloadsIndexModel : PageModel
         if (uploadFile == null || uploadFile.Length == 0)
             return RedirectToPage(new { gruppe });
 
+        // Gruppe serverseitig bestimmen: Config-String-Seite erzwingt die Gruppe,
+        // sonst muss zwingend eine Gruppe gewählt worden sein.
+        var navItem    = string.IsNullOrEmpty(navItemId) ? null : await _nav.GetByIdAsync(navItemId);
+        var pageGruppe = navItem?.ConfigString ?? "";
+        var effektiveGruppe = !string.IsNullOrWhiteSpace(pageGruppe) ? pageGruppe : (gruppe ?? "");
+        if (string.IsNullOrWhiteSpace(effektiveGruppe))
+        {
+            TempData["UploadMessage"] = "Bitte eine Gruppe auswählen.";
+            return RedirectToPage(new { gruppe = string.IsNullOrWhiteSpace(gruppe) ? null : gruppe });
+        }
+
         var item = new Download
         {
             Beschreibung = beschreibung ?? "",
             Klasse       = klasse ?? "",
-            Gruppe       = gruppe ?? "",
+            Gruppe       = effektiveGruppe,
             CreatedBy    = User.Identity?.Name ?? ""
         };
         await _downloads.CreateAsync(item, uploadFile);

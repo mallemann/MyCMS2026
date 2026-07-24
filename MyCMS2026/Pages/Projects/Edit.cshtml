@@ -18,7 +18,7 @@
         }
         else
         {
-            <a asp-page="Index" class="btn btn-outline-secondary btn-sm">
+            <a href="@(string.IsNullOrEmpty(Model.ReturnPageId) ? Url.Content("~/") : Url.Page("/Page/Index", new { id = Model.ReturnPageId }))" class="btn btn-outline-secondary btn-sm">
                 <i class="bi bi-arrow-left me-1"></i>Zurück
             </a>
         }
@@ -102,14 +102,14 @@
                         }
                         else
                         {
-                            <select asp-for="Input.Gruppe" class="form-select">
-                                <option value="">– keine –</option>
+                            <select asp-for="Input.Gruppe" class="form-select" required>
+                                <option value="">– Gruppe wählen –</option>
                                 @foreach (var g in Model.AvailableGruppen)
                                 {
                                     <option value="@g" selected="@(Model.Input.Gruppe == g)">@g</option>
                                 }
                             </select>
-                            <div class="form-text">Gruppe, zu der dieses Projekt gehört.</div>
+                            <div class="form-text">Gruppe, zu der dieses Projekt gehört (Pflicht).</div>
                         }
                     </div>
                     <div class="col-md-4">
@@ -167,7 +167,7 @@
                 }
                 else
                 {
-                    <a asp-page="Index" class="btn btn-outline-secondary">Abbrechen</a>
+                    <a href="@(string.IsNullOrEmpty(Model.ReturnPageId) ? Url.Content("~/") : Url.Page("/Page/Index", new { id = Model.ReturnPageId }))" class="btn btn-outline-secondary">Abbrechen</a>
                 }
             </div>
         </form>

@@ -12,12 +12,14 @@ public class ProjectDetailModel : PageModel
     private readonly ProjectService _projects;
     private readonly TodoService _todos;
     private readonly MeetingService _meetings;
+    private readonly WeeklyMailService _weeklyMail;
 
-    public ProjectDetailModel(ProjectService projects, TodoService todos, MeetingService meetings)
+    public ProjectDetailModel(ProjectService projects, TodoService todos, MeetingService meetings, WeeklyMailService weeklyMail)
     {
-        _projects = projects;
-        _todos    = todos;
-        _meetings = meetings;
+        _projects   = projects;
+        _todos      = todos;
+        _meetings   = meetings;
+        _weeklyMail = weeklyMail;
     }
 
     public Project Project { get; private set; } = new();
@@ -45,7 +47,8 @@ public class ProjectDetailModel : PageModel
 
         var project = await _projects.GetByIdAsync(id);
         if (project == null) return false;
-        if (!_projects.CanRead(project, IsAdmin, userRoles)) return false;
+        var allowedGruppen = await _weeklyMail.GetAllowedGruppenAsync(User.Identity?.Name ?? "");
+        if (!_projects.CanRead(project, IsAdmin, allowedGruppen)) return false;
 
         Project    = project;
         CanEdit    = _projects.CanEdit(project, IsAdmin, userRoles);

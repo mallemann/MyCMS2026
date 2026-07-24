@@ -111,6 +111,14 @@ public class ProjectEditModel : PageModel
             return Page();
         }
 
+        // Neuanlage: Gruppe ist Pflicht (scoped Seite erzwingt sie, unscoped muss gewählt werden)
+        if (isNew && !GruppeLocked && string.IsNullOrWhiteSpace(Input.Gruppe))
+        {
+            Error = "Bitte eine Gruppe auswählen.";
+            await LoadUsersAsync();
+            return Page();
+        }
+
         if (isNew)
         {
             // Anlege-Recht: Admin ODER ExtendedAccess auf der Ursprungsseite
@@ -141,5 +149,15 @@ public class ProjectEditModel : PageModel
             await _projects.UpdateAsync(Input, userName);
             return RedirectToPage("Detail", new { id = Input.Id });
         }
+    }
+
+    // Löschen (vom Projekte-Widget aus). Ersetzt den früheren Handler der entfernten Projects/Index-Seite.
+    public async Task<IActionResult> OnPostDeleteAsync(string id, string? returnPageId)
+    {
+        if (!User.IsInRole("Administrator")) return Forbid();
+        await _projects.DeleteAsync(id);
+        if (!string.IsNullOrEmpty(returnPageId))
+            return RedirectToPage("/Page/Index", new { id = returnPageId });
+        return Redirect("~/");
     }
 }

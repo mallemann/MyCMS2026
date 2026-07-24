@@ -13,13 +13,15 @@ public class MeetingEditModel : PageModel
     private readonly UserService _users;
     private readonly ProjectService _projects;
     private readonly NavigationService _nav;
+    private readonly WeeklyMailService _weeklyMail;
 
-    public MeetingEditModel(MeetingService meetings, UserService users, ProjectService projects, NavigationService nav)
+    public MeetingEditModel(MeetingService meetings, UserService users, ProjectService projects, NavigationService nav, WeeklyMailService weeklyMail)
     {
-        _meetings = meetings;
-        _users    = users;
-        _projects = projects;
-        _nav      = nav;
+        _meetings   = meetings;
+        _users      = users;
+        _projects   = projects;
+        _nav        = nav;
+        _weeklyMail = weeklyMail;
     }
 
     [BindProperty] public Meeting Meeting { get; set; } = new();
@@ -44,11 +46,9 @@ public class MeetingEditModel : PageModel
 
     private async Task LoadProjectsAsync()
     {
-        var isAdmin   = User.IsInRole("Administrator");
-        var userRoles = User.Claims
-            .Where(c => c.Type == System.Security.Claims.ClaimTypes.Role)
-            .Select(c => c.Value);
-        Projects = await _projects.GetVisibleAsync(isAdmin, userRoles);
+        var isAdmin        = User.IsInRole("Administrator");
+        var allowedGruppen = await _weeklyMail.GetAllowedGruppenAsync(User.Identity?.Name ?? "");
+        Projects = await _projects.GetVisibleAsync(isAdmin, allowedGruppen);
     }
 
     /// <summary>Returns true if the current user has ExtendedAccess on a nav page.</summary>
@@ -131,6 +131,15 @@ public class MeetingEditModel : PageModel
         if (string.IsNullOrWhiteSpace(Meeting.Thema))
         {
             Error = "Thema ist ein Pflichtfeld.";
+            await LoadKuerzelAsync();
+            await LoadProjectsAsync();
+            return Page();
+        }
+
+        // Neuanlage: Gruppe ist Pflicht (scoped Widget liefert sie, unscoped muss gewählt werden)
+        if (string.IsNullOrEmpty(Meeting.Id) && string.IsNullOrWhiteSpace(Meeting.Gruppe))
+        {
+            Error = "Bitte eine Gruppe auswählen.";
             await LoadKuerzelAsync();
             await LoadProjectsAsync();
             return Page();

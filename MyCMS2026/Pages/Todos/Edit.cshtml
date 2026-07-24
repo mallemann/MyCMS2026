@@ -2,11 +2,16 @@
 @model MyCMS2026.Pages.Todos.TodoEditModel
 @inject MyCMS2026.Services.KlassenService KlassenSvc
 @inject MyCMS2026.Services.GruppenService GruppenSvc
+@inject MyCMS2026.Services.WeeklyMailService WeeklyMailSvc
 @{
     ViewData["Title"] = string.IsNullOrEmpty(Model.Todo.Id) ? "Neue Aufgabe" : "Aufgabe bearbeiten";
     var isNew = string.IsNullOrEmpty(Model.Todo.Id);
     var todoKlassen = await KlassenSvc.GetKlassenAsync("todos");
     var alleGruppen = await GruppenSvc.GetAllAsync();
+    var isAdmin = User.IsInRole("Administrator");
+    var allowedGruppen = await WeeklyMailSvc.GetAllowedGruppenAsync(User.Identity?.Name ?? "");
+    // Freie Gruppenwahl nur beim Neuanlegen ohne vorgegebene Gruppe (unscoped Widget, kein Projekt)
+    var gruppeFreiWaehlbar = isNew && string.IsNullOrEmpty(Model.Todo.Gruppe);
 }
 
 <div>
@@ -85,12 +90,25 @@
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label fw-semibold">Gruppe</label>
-                    <input type="hidden" asp-for="Todo.Gruppe" />
-                    <input class="form-control" value="@(Model.Todo.Gruppe ?? "")" readonly />
-                    @if (!string.IsNullOrEmpty(Model.ProjectGruppe))
+                    <label class="form-label fw-semibold">Gruppe @if (gruppeFreiWaehlbar) {<span class="text-danger">*</span>}</label>
+                    @if (gruppeFreiWaehlbar)
                     {
-                        <div class="form-text text-muted"><i class="bi bi-lock me-1"></i>Vom Projekt vorgegeben</div>
+                        <select asp-for="Todo.Gruppe" class="form-select" required>
+                            <option value="">– Gruppe wählen –</option>
+                            @foreach (var g in (isAdmin ? alleGruppen : allowedGruppen))
+                            {
+                                <option value="@g">@g</option>
+                            }
+                        </select>
+                    }
+                    else
+                    {
+                        <input type="hidden" asp-for="Todo.Gruppe" />
+                        <input class="form-control" value="@(Model.Todo.Gruppe ?? "")" readonly />
+                        @if (!string.IsNullOrEmpty(Model.ProjectGruppe))
+                        {
+                            <div class="form-text text-muted"><i class="bi bi-lock me-1"></i>Vom Projekt vorgegeben</div>
+                        }
                     }
                 </div>
             </div>

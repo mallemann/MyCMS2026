@@ -3,6 +3,7 @@
 @using MyCMS2026.Models
 @inject MeetingService MeetingSvc
 @inject MyCMS2026.Services.KlassenService KlassenSvc
+@inject WeeklyMailService WeeklyMailSvc
 @{
     var isAdmin        = User.IsInRole("Administrator");
     var gruppe         = Model.NavItem?.ConfigString ?? "";
@@ -17,9 +18,21 @@
     var klasse = Context.Request.Query["klasse"].ToString();
     var meine  = Context.Request.Query["meine"].ToString() == "1";
 
+    // Access-Gruppen des Users (Sichtbarkeits-Gate; ConfigString verengt zusätzlich)
+    var cfg            = await WeeklyMailSvc.GetConfigAsync();
+    var recipient      = cfg.Recipients.FirstOrDefault(r => string.Equals(r.UserId, currentUser, StringComparison.OrdinalIgnoreCase));
+    var allowedGruppen = recipient?.AllowedGruppen ?? new List<string>();
+    bool CanSeeGr(string? g)
+    {
+        if (isAdmin) return string.IsNullOrWhiteSpace(gruppe) || string.Equals(g, gruppe, StringComparison.OrdinalIgnoreCase);
+        if (!allowedGruppen.Any()) return false;
+        if (!string.IsNullOrWhiteSpace(gruppe))
+            return string.Equals(g, gruppe, StringComparison.OrdinalIgnoreCase) && allowedGruppen.Contains(g, StringComparer.OrdinalIgnoreCase);
+        return !string.IsNullOrEmpty(g) && allowedGruppen.Contains(g, StringComparer.OrdinalIgnoreCase);
+    }
+
     var all = await MeetingSvc.GetAllAsync();
-    if (!string.IsNullOrWhiteSpace(gruppe))
-        all = all.Where(m => m.Gruppe == gruppe).ToList();
+    all = all.Where(m => CanSeeGr(m.Gruppe)).ToList();
     if (!string.IsNullOrWhiteSpace(search))
         all = all.Where(m => m.Thema.Contains(search, StringComparison.OrdinalIgnoreCase) ||
                               m.Leitung.Contains(search, StringComparison.OrdinalIgnoreCase) ||
@@ -31,6 +44,12 @@
     if (meine)
         all = all.Where(m => (!string.IsNullOrEmpty(currentUser)    && m.Leitung.Equals(currentUser,    StringComparison.OrdinalIgnoreCase))
                            || (!string.IsNullOrEmpty(currentKuerzel) && m.Leitung.Equals(currentKuerzel, StringComparison.OrdinalIgnoreCase))).ToList();
+}
+
+@if (!isAdmin && !allowedGruppen.Any())
+{
+    <div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-2"></i>Sie sind keiner Gruppe zugeordnet – bitte Administrator kontaktieren.</div>
+    return;
 }
 
 @* Delete-Forms ausserhalb der Tabelle *@

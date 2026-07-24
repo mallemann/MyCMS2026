@@ -87,4 +87,39 @@ public class WeeklyMailModel : PageModel
         await LoadAsync();
         return Page();
     }
+
+    public async Task<IActionResult> OnPostSendToUserAsync(string userId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            Message = "Kein Benutzer angegeben.";
+            IsError = true;
+            await LoadAsync();
+            return Page();
+        }
+        try
+        {
+            // Test-Weekly geht an den auslösenden Administrator, nicht an den User.
+            var adminUser  = await _users.GetByNameAsync(User.Identity?.Name ?? "");
+            var adminEmail = adminUser?.Email ?? "";
+            if (string.IsNullOrWhiteSpace(adminEmail))
+            {
+                Message = "Ihre Administrator-E-Mail ist nicht hinterlegt – Test kann nicht versendet werden.";
+                IsError = true;
+                await LoadAsync();
+                return Page();
+            }
+
+            var result = await _mailSvc.SendWeeklyToUserAsync(userId, adminEmail);
+            Message = $"{result} ({DateTime.Now:dd.MM.yyyy HH:mm})";
+            IsError = result.StartsWith("Kein") || result.StartsWith("Keine");
+        }
+        catch (Exception ex)
+        {
+            Message = $"Fehler: {ex.Message}";
+            IsError = true;
+        }
+        await LoadAsync();
+        return Page();
+    }
 }

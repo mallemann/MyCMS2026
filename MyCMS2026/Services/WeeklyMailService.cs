@@ -77,6 +77,14 @@ public class WeeklyMailService
 
     public async Task<WeeklyMailConfig> GetConfigAsync() => await LoadAsync();
 
+    /// <summary>Access-Gruppen eines Users (leer, wenn kein Recipient konfiguriert).</summary>
+    public async Task<List<string>> GetAllowedGruppenAsync(string userName)
+    {
+        var cfg = await LoadAsync();
+        var r = cfg.Recipients.FirstOrDefault(x => string.Equals(x.UserId, userName, StringComparison.OrdinalIgnoreCase));
+        return r?.AllowedGruppen ?? new List<string>();
+    }
+
     public async Task SaveConfigAsync(WeeklyMailConfig cfg)
     {
         var current = await LoadAsync();
@@ -133,6 +141,45 @@ public class WeeklyMailService
 
         cfg.LastSentAt = DateTime.Now;
         await SaveAsync(cfg);
+    }
+
+    /// <summary>
+    /// Erzeugt das Weekly Mail eines Users (dessen Access-Gruppen/Einstellungen) und schickt es
+    /// als Vorschau/Test an <paramref name="sendTo"/> (i.d.R. den auslösenden Administrator).
+    /// </summary>
+    public async Task<string> SendWeeklyToUserAsync(string userId, string sendTo)
+    {
+        if (string.IsNullOrWhiteSpace(sendTo))
+            return "Keine Ziel-E-Mail-Adresse (Admin) vorhanden.";
+
+        var cfg = await LoadAsync();
+        var recipient = cfg.Recipients.FirstOrDefault(r =>
+            string.Equals(r.UserId, userId, StringComparison.OrdinalIgnoreCase));
+        if (recipient == null)
+            return $"Kein Empfänger-Eintrag für '{userId}' vorhanden.";
+
+        var siteConfig  = await _site.GetAsync();
+        var baseUrl     = siteConfig.BaseUrl.TrimEnd('/');
+        var allTodos    = await _todos.GetAllAsync();
+        var allMeetings = await _meetings.GetAllAsync();
+        var allProjects = await _projects.GetAllAsync();
+        var cutoff      = DateTime.Today.AddDays(-7);
+
+        // Inhalt aus Sicht des Ziel-Users erzeugen
+        var user      = await _users.GetByNameAsync(recipient.UserId);
+        var userRoles = user?.Roles ?? new List<string>();
+        var isAdmin   = userRoles.Contains("Administrator");
+
+        var html = BuildMail(recipient, userRoles, isAdmin,
+            allTodos, allMeetings, allProjects, cutoff, baseUrl);
+
+        // ... aber an den Admin senden (Vorschau), Betreff als Test markiert
+        var subject  = $"[TEST – {userId}] Weekly Update – {DateTime.Today:dd.MM.yyyy}";
+        var response = await _email.SendTestAsync(sendTo, subject, html);
+        _log.LogInformation("Weekly-Test für {User} an Admin {Admin}: {Response}", userId, sendTo, response);
+        return string.IsNullOrWhiteSpace(response)
+            ? $"Test-Weekly für '{userId}' an {sendTo} übergeben."
+            : $"Test-Weekly für '{userId}' an {sendTo} gesendet. Serverantwort: {response}";
     }
 
     // ── HTML-Builder ─────────────────────────────────────────────────────────
@@ -254,7 +301,8 @@ public class WeeklyMailService
             var journalItems = new List<(Project project, JournalEntry entry)>();
             foreach (var project in allProjects)
             {
-                if (!isAdmin && !_projects.CanRead(project, isAdmin, userRoles)) continue;
+                // Report ist gruppen-scoped für ALLE (auch Admins): nur Journale erlaubter Gruppen.
+                if (!recipient.AllowedGruppen.Contains(project.Gruppe, StringComparer.OrdinalIgnoreCase)) continue;
                 foreach (var entry in project.Journal.Where(e => e.CreatedAt >= cutoff))
                     journalItems.Add((project, entry));
             }
@@ -298,7 +346,7 @@ public class WeeklyMailService
             if (!string.IsNullOrEmpty(t.ProjectId))
             {
                 var proj = projects.FirstOrDefault(p => p.Id == t.ProjectId);
-                return proj is not null && _projects.CanRead(proj, isAdmin, userRoles);
+                return proj is not null && recipient.AllowedGruppen.Contains(proj.Gruppe, StringComparer.OrdinalIgnoreCase);
             }
             if (string.IsNullOrEmpty(t.Gruppe))
                 return true;
@@ -315,7 +363,7 @@ public class WeeklyMailService
             if (!string.IsNullOrEmpty(m.ProjectId))
             {
                 var proj = projects.FirstOrDefault(p => p.Id == m.ProjectId);
-                return proj is not null && _projects.CanRead(proj, isAdmin, userRoles);
+                return proj is not null && recipient.AllowedGruppen.Contains(proj.Gruppe, StringComparer.OrdinalIgnoreCase);
             }
             if (string.IsNullOrEmpty(m.Gruppe))
                 return true;

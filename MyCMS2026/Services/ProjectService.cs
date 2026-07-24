@@ -89,9 +89,11 @@ public class ProjectService
 
     // ── Access helpers ───────────────────────────────────────────────────────
 
-    public bool CanRead(Project p, bool isAdmin, IEnumerable<string> userRoles) =>
-        isAdmin || string.IsNullOrEmpty(p.LeseRolle) || userRoles.Contains(p.LeseRolle);
+    // Lesen: Datenmenge kommt aus den Access-Gruppen des Users (analog Meetings/ToDos).
+    public bool CanRead(Project p, bool isAdmin, IEnumerable<string> allowedGruppen) =>
+        isAdmin || allowedGruppen.Contains(p.Gruppe, StringComparer.OrdinalIgnoreCase);
 
+    // Bearbeiten: kommt aus der Bearbeiten-Rolle (bei Widget-Anlage = ExtendedAccessRole des Widgets).
     public bool CanEdit(Project p, bool isAdmin, IEnumerable<string> userRoles) =>
         isAdmin || (!string.IsNullOrEmpty(p.BearbeitenRolle) && userRoles.Contains(p.BearbeitenRolle));
 
@@ -100,11 +102,11 @@ public class ProjectService
     public async Task<List<Project>> GetAllAsync() =>
         (await LoadAsync()).OrderBy(p => p.Status == "Abgeschlossen").ThenBy(p => p.Name).ToList();
 
-    public async Task<List<Project>> GetVisibleAsync(bool isAdmin, IEnumerable<string> userRoles)
+    public async Task<List<Project>> GetVisibleAsync(bool isAdmin, IEnumerable<string> allowedGruppen)
     {
-        var roles = userRoles.ToList();
+        var gruppen = allowedGruppen.ToList();
         return (await LoadAsync())
-            .Where(p => CanRead(p, isAdmin, roles))
+            .Where(p => CanRead(p, isAdmin, gruppen))
             .OrderBy(p => p.Status == "Abgeschlossen").ThenBy(p => p.Name)
             .ToList();
     }

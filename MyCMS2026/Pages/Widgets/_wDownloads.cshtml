@@ -3,24 +3,47 @@
 @using MyCMS2026.Models
 @inject DownloadService DownloadSvc
 @inject MyCMS2026.Services.KlassenService KlassenSvc
+@inject WeeklyMailService WeeklyMailSvc
+@inject GruppenService GruppenSvc
 @{
+    var isAdmin = User.IsInRole("Administrator");
     var canEdit = Model.HasExtendedAccess;
     var gruppe  = Model.NavItem?.ConfigString ?? "";
     var pageId  = Model.Id;
+    var userName = User.Identity?.Name ?? "";
     var dlKlassen = await KlassenSvc.GetKlassenAsync("downloads");
+    var alleGruppen = await GruppenSvc.GetAllAsync();
 
     // Filter aus Query-String
     var search = Context.Request.Query["search"].ToString();
     var klasse = Context.Request.Query["klasse"].ToString();
 
+    // Access-Gruppen des Users (Sichtbarkeits-Gate; ConfigString verengt zusätzlich)
+    var cfg            = await WeeklyMailSvc.GetConfigAsync();
+    var recipient      = cfg.Recipients.FirstOrDefault(r => string.Equals(r.UserId, userName, StringComparison.OrdinalIgnoreCase));
+    var allowedGruppen = recipient?.AllowedGruppen ?? new List<string>();
+    bool CanSeeGr(string? g)
+    {
+        if (isAdmin) return string.IsNullOrWhiteSpace(gruppe) || string.Equals(g, gruppe, StringComparison.OrdinalIgnoreCase);
+        if (!allowedGruppen.Any()) return false;
+        if (!string.IsNullOrWhiteSpace(gruppe))
+            return string.Equals(g, gruppe, StringComparison.OrdinalIgnoreCase) && allowedGruppen.Contains(g, StringComparer.OrdinalIgnoreCase);
+        return !string.IsNullOrEmpty(g) && allowedGruppen.Contains(g, StringComparer.OrdinalIgnoreCase);
+    }
+
     var all = await DownloadSvc.GetAllAsync();
-    if (!string.IsNullOrWhiteSpace(gruppe))
-        all = all.Where(d => d.Gruppe == gruppe).ToList();
+    all = all.Where(d => CanSeeGr(d.Gruppe)).ToList();
     if (!string.IsNullOrWhiteSpace(search))
         all = all.Where(d => d.Beschreibung.Contains(search, StringComparison.OrdinalIgnoreCase) ||
                               d.OriginalName.Contains(search, StringComparison.OrdinalIgnoreCase)).ToList();
     if (!string.IsNullOrWhiteSpace(klasse))
         all = all.Where(d => d.Klasse == klasse).ToList();
+}
+
+@if (!isAdmin && !allowedGruppen.Any())
+{
+    <div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-2"></i>Sie sind keiner Gruppe zugeordnet – bitte Administrator kontaktieren.</div>
+    return;
 }
 
 @* Upload-Modal (nur für canEdit) *@
@@ -30,13 +53,29 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <form method="post" asp-page="/Downloads/Index" asp-page-handler="Upload" enctype="multipart/form-data">
-                    <input type="hidden" name="gruppe" value="@gruppe" />
+                    @if (!string.IsNullOrWhiteSpace(gruppe))
+                    {
+                        <input type="hidden" name="gruppe" value="@gruppe" />
+                    }
                     <input type="hidden" name="navItemId" value="@pageId" />
                     <div class="modal-header card-header-cms rounded-0">
                         <h5 class="modal-title text-white"><i class="bi bi-upload me-2"></i>Datei hochladen</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
+                        @if (string.IsNullOrWhiteSpace(gruppe))
+                        {
+                            <div class="mb-3">
+                                <label class="form-label">Gruppe <span class="text-danger">*</span></label>
+                                <select name="gruppe" class="form-select" required>
+                                    <option value="">– Gruppe wählen –</option>
+                                    @foreach (var g in (isAdmin ? alleGruppen : allowedGruppen))
+                                    {
+                                        <option value="@g">@g</option>
+                                    }
+                                </select>
+                            </div>
+                        }
                         <div class="mb-3">
                             <label class="form-label">Datei <span class="text-danger">*</span></label>
                             <input type="file" name="uploadFile" class="form-control" required />
