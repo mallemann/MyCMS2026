@@ -371,3 +371,4 @@ MyCMS2026/App_Data/demo/*
 
 # Produktions-Konfiguration mit Secrets (PccLink, etc.) — nie ins Repo
 MyCMS2026/appsettings.Production.json
+MyCMS2026/appsettings.Development.json
