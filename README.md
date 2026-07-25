@@ -95,24 +95,8 @@ Die Konfiguration erfolgt über die üblichen `appsettings`-Dateien:
 
 - `appsettings.json` – Basiskonfiguration (im Repository enthalten, ohne Secrets)
 - `appsettings.Development.json` – lokale Entwicklung *(nicht im Repository)*
-- `appsettings.Production.json` – Produktionsumgebung inkl. Secrets *(nicht im Repository, per `.gitignore` ausgeschlossen)*
+- `appsettings.Production.json` – Produktionsumgebung  *(nicht im Repository)*
 
-> **Wichtig:** `appsettings.Production.json` enthält produktive Secrets (z. B. `PccLink:Secret`) und wird **bewusst nicht** eingecheckt. Für ein eigenes Deployment muss diese Datei lokal auf dem Server angelegt werden.
-
-Beispiel `appsettings.Production.json`:
-
-```json
-{
-  "Logging": {
-    "LogLevel": { "Default": "Warning", "Microsoft.AspNetCore": "Warning" }
-  },
-  "PccLink": {
-    "BaseUrl": "https://example.com/Dashboards/",
-    "Secret": "<hier-eigenes-secret-einsetzen>"
-  },
-  "AlbatrosEnabled": true
-}
-```
 
 Optionaler `PathBase` (für Betrieb in einem Unterverzeichnis) kann per Konfigurationsschlüssel `PathBase` gesetzt werden.
 
