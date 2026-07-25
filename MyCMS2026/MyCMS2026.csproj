@@ -25,12 +25,17 @@
     <Content Update="App_Data\*.json">
       <CopyToPublishDirectory>Never</CopyToPublishDirectory>
     </Content>
+    <Content Update="appsettings.Development.json">
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+    </Content>
     <Content Update="App_Data\setup-complete">
       <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+          <CopyToPublishDirectory>Never</CopyToPublishDirectory>
     </Content>
     <!-- Secrets: nie publizieren -->
     <Content Update="appsettings.Production.json">
       <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
 
