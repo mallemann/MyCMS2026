@@ -45,47 +45,89 @@
     var timelineMeetings  = meetings.OrderByDescending(m => m.Datum).ToList();
     var ueberfaellig      = offeneTodos.Count(t => t.ErledigenBis.Date < today);
     var naechstesMeeting  = geplantteMeetings.FirstOrDefault(m => m.Datum.Date >= today);
+    var geplantZukunft    = geplantteMeetings.Count(m => m.Datum.Date >= today);
+
+    // Tasks in drei Fälligkeits-Töpfe: überfällig / bis Monatsende / danach
+    var monatsEnde = new DateTime(today.Year, today.Month, DateTime.DaysInMonth(today.Year, today.Month));
+
+    var buckets = new[]
+    {
+        (Key: "ueberfaellig", Titel: "Überfällig",   Icon: "bi-exclamation-triangle", Farbe: "text-danger",
+         Items: offeneTodos.Where(t => t.ErledigenBis.Date <  today).ToList()),
+        (Key: "monat",        Titel: "Diesen Monat", Icon: "bi-clock",                Farbe: "text-warning",
+         Items: offeneTodos.Where(t => t.ErledigenBis.Date >= today && t.ErledigenBis.Date <= monatsEnde).ToList()),
+        (Key: "spaeter",      Titel: "Später",       Icon: "bi-calendar3",            Farbe: "text-muted",
+         Items: offeneTodos.Where(t => t.ErledigenBis.Date >  monatsEnde).ToList())
+    };
+
+    // Gruppen-Chips nur anbieten, wenn es überhaupt mehr als eine Gruppe gibt
+    var gruppen = offeneTodos.Select(t => t.Gruppe)
+                             .Where(g => !string.IsNullOrWhiteSpace(g))
+                             .Distinct(StringComparer.OrdinalIgnoreCase)
+                             .OrderBy(g => g).ToList();
+
+    // «Nur meine»: Verantwortlich trägt das Kürzel, ältere Einträge den Benutzernamen (Muster aus _wToDo)
+    var currentKuerzel = User.FindFirst("Kuerzel")?.Value ?? "";
+    bool IstMeine(TodoItem t) =>
+        (!string.IsNullOrEmpty(currentKuerzel) && t.Verantwortlich.Equals(currentKuerzel, StringComparison.OrdinalIgnoreCase)) ||
+        (!string.IsNullOrEmpty(userName)       && t.Verantwortlich.Equals(userName,       StringComparison.OrdinalIgnoreCase));
+
+    var hatIdentitaet = !string.IsNullOrEmpty(currentKuerzel) || !string.IsNullOrEmpty(userName);
+    var meineCount    = offeneTodos.Count(IstMeine);
 }
 
-@* ── KPI-Kacheln ─────────────────────────────────────────────── *@
+@* ── KPI-Kacheln (klickbar = Filter auf einen Fälligkeits-Topf) ── *@
 @if (offeneTodos.Any() || geplantteMeetings.Any())
 {
     <div class="row g-3 mb-4">
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm h-100 text-center py-3 px-2">
-                <div class="text-cms mb-1"><i class="bi bi-check2-square fs-3"></i></div>
-                <div class="display-6 fw-bold lh-1">@offeneTodos.Count</div>
-                <div class="text-muted small mt-1">Offene Tasks</div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm h-100 text-center py-3 px-2 @(ueberfaellig > 0 ? "border-start border-4 border-danger" : "")">
+            <button type="button" class="card border-0 shadow-sm h-100 w-100 text-center py-3 px-2 @(offeneTodos.Any() ? "hm-kpi" : "")"
+                    data-bucket="ueberfaellig" title="Nur überfällige Tasks zeigen">
                 <div class="@(ueberfaellig > 0 ? "text-danger" : "text-muted") mb-1"><i class="bi bi-exclamation-triangle fs-3"></i></div>
-                <div class="display-6 fw-bold lh-1 @(ueberfaellig > 0 ? "text-danger" : "text-muted")">@ueberfaellig</div>
-                <div class="text-muted small mt-1">Überfällig</div>
-            </div>
+                <div class="display-6 fw-bold lh-1 @(ueberfaellig > 0 ? "text-danger" : "text-muted")"
+                     data-kpi="ueberfaellig">@ueberfaellig</div>
+                <div class="text-muted small mt-1">Tasks überfällig</div>
+            </button>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm h-100 text-center py-3 px-2">
-                <div class="text-info mb-1"><i class="bi bi-calendar-event fs-3"></i></div>
-                <div class="display-6 fw-bold lh-1">@geplantteMeetings.Count</div>
-                <div class="text-muted small mt-1">Geplante Meetings</div>
-            </div>
+            <button type="button" class="card border-0 shadow-sm h-100 w-100 text-center py-3 px-2 @(offeneTodos.Any() ? "hm-kpi" : "")"
+                    data-bucket="monat" title="Nur Tasks bis Monatsende zeigen">
+                <div class="text-warning mb-1"><i class="bi bi-clock fs-3"></i></div>
+                <div class="display-6 fw-bold lh-1" data-kpi="monat">@buckets[1].Items.Count</div>
+                <div class="text-muted small mt-1">Tasks diesen Monat</div>
+            </button>
+        </div>
+        <div class="col-6 col-md-3">
+            <button type="button" class="card border-0 shadow-sm h-100 w-100 text-center py-3 px-2 @(offeneTodos.Any() ? "hm-kpi" : "")"
+                    data-bucket="" title="Alle offenen Tasks zeigen">
+                <div class="text-cms mb-1"><i class="bi bi-check2-square fs-3"></i></div>
+                <div class="display-6 fw-bold lh-1" data-kpi="offen">@offeneTodos.Count</div>
+                <div class="text-muted small mt-1">Tasks offen total</div>
+            </button>
         </div>
         <div class="col-6 col-md-3">
             @if (naechstesMeeting != null)
             {
                 var daysUntil = (naechstesMeeting.Datum.Date - today).Days;
-                <a asp-page="/Meetings/Detail" asp-route-id="@naechstesMeeting.Id"
-                   asp-route-returnPageId="@Model.NavItem?.Id"
-                   class="card border-0 shadow-sm h-100 text-center py-3 px-2 text-decoration-none d-block">
-                    <div class="text-success mb-1"><i class="bi bi-arrow-right-circle fs-3"></i></div>
-                    <div class="fw-bold lh-1 small">@naechstesMeeting.Datum.ToString("dd. MMM")</div>
-                    <div class="text-muted small mt-1 text-truncate px-1">@naechstesMeeting.Thema</div>
-                    <div class="small @(daysUntil == 0 ? "text-warning fw-bold" : "text-success")">
-                        @(daysUntil == 0 ? "Heute" : $"in {daysUntil} Tag{(daysUntil == 1 ? "" : "en")}")
-                    </div>
-                </a>
+                <div class="card border-0 shadow-sm h-100 text-center py-3 px-2">
+                    <a asp-page="/Meetings/Detail" asp-route-id="@naechstesMeeting.Id"
+                       asp-route-returnPageId="@Model.NavItem?.Id"
+                       class="text-decoration-none d-block">
+                        <div class="text-success mb-1"><i class="bi bi-calendar-event fs-3"></i></div>
+                        <div class="fs-5 fw-bold lh-1">
+                            @naechstesMeeting.Datum.ToString("dd. MMM")
+                            <span class="small fw-normal @(daysUntil == 0 ? "text-warning" : "text-success")">
+                                · @(daysUntil == 0 ? "heute" : $"in {daysUntil} Tag{(daysUntil == 1 ? "" : "en")}")
+                            </span>
+                        </div>
+                        <div class="text-muted small mt-1">Nächstes Meeting</div>
+                        <div class="small text-body text-truncate px-1">@naechstesMeeting.Thema</div>
+                    </a>
+                    <a asp-page="/Meetings/Index" asp-route-status="Geplant" asp-route-zukunft="true"
+                       class="small text-decoration-none mt-2 pt-2 border-top d-block">
+                        Alle geplanten Meetings <span class="badge bg-light text-dark border">@geplantZukunft</span>
+                    </a>
+                </div>
             }
             else
             {
@@ -147,126 +189,188 @@
     </div>
 </div>
 
-@* ── Offene Tasks + Geplante Meetings ─────────────────────── *@
-@if (offeneTodos.Any() || geplantteMeetings.Any())
+@* ── Offene Tasks nach Fälligkeit ──────────────────────────── *@
+@if (offeneTodos.Any())
 {
-    <div class="row mt-2 g-3">
-
-        @* Offene Tasks *@
-        <div class="col-lg-6">
-            <h6 class="text-muted border-bottom pb-2 mb-3">
-                <i class="bi bi-check2-square me-2"></i>Offene Tasks
-                <span class="badge bg-secondary ms-1">@offeneTodos.Count</span>
-            </h6>
-            <div class="card border-0 shadow-sm">
-                @if (!offeneTodos.Any())
-                {
-                    <div class="card-body text-muted small">Keine offenen Tasks.</div>
-                }
-                else
-                {
-                    <div class="px-1">
-                        @foreach (var t in offeneTodos.Take(15))
-                        {
-                            var diff     = (t.ErledigenBis.Date - today).TotalDays;
-                            var stripe   = diff < 0 ? "#dc3545" : diff <= 7 ? "#ffc107" : "#dee2e6";
-                            var dateClr  = diff < 0 ? "text-danger" : diff <= 7 ? "text-warning" : "text-muted";
-                            <div class="d-flex align-items-center gap-2 py-2 border-bottom">
-                                <div style="width:4px;min-height:36px;border-radius:2px;background:@stripe;flex-shrink:0"></div>
-                                <div class="flex-grow-1 overflow-hidden">
-                                    <a asp-page="/Todos/Detail" asp-route-id="@t.Id"
-                                       asp-route-returnPageId="@Model.NavItem?.Id"
-                                       class="text-decoration-none text-body fw-semibold d-block text-truncate">
-                                        @t.Thema
-                                    </a>
-                                    <div class="mt-1">
-                                        @if (!string.IsNullOrEmpty(t.ProjectName))
-                                        {
-                                            <a href="@Url.Page("/Projects/Detail", new { id = t.ProjectId })"
-                                               class="badge bg-light text-dark border me-1 text-decoration-none small">
-                                                <i class="bi bi-kanban me-1"></i>@t.ProjectName
-                                            </a>
-                                        }
-                                        @if (!string.IsNullOrEmpty(t.Gruppe))
-                                        {
-                                            <span class="badge bg-light text-dark border me-1 small">@t.Gruppe</span>
-                                        }
-                                    </div>
-                                </div>
-                                <div class="text-end small text-nowrap flex-shrink-0">
-                                    <div class="text-muted">#@t.TaskNr</div>
-                                    <div class="@dateClr">@t.ErledigenBis.ToString("dd.MM.yy")</div>
-                                    <div class="text-muted">@t.Verantwortlich</div>
-                                </div>
-                            </div>
-                        }
-                    </div>
-                    @if (offeneTodos.Count > 15)
-                    {
-                        <div class="px-3 py-2 text-muted small">+ @(offeneTodos.Count - 15) weitere</div>
-                    }
-                }
-            </div>
-        </div>
-
-        @* Geplante Meetings *@
-        <div class="col-lg-6">
-            <h6 class="text-muted border-bottom pb-2 mb-3">
-                <i class="bi bi-calendar-check me-2"></i>Geplante Meetings
-                <span class="badge bg-secondary ms-1">@geplantteMeetings.Count</span>
-            </h6>
-            <div class="card border-0 shadow-sm">
-                @if (!geplantteMeetings.Any())
-                {
-                    <div class="card-body text-muted small">Keine geplanten Meetings.</div>
-                }
-                else
-                {
-                    <div class="px-1">
-                        @foreach (var m in geplantteMeetings.Take(15))
-                        {
-                            var daysTo   = (m.Datum.Date - today).TotalDays;
-                            var stripe   = daysTo == 0 ? "#ffc107" : daysTo <= 7 ? "#0dcaf0" : "#dee2e6";
-                            var dateClr  = daysTo == 0 ? "text-warning fw-bold" : daysTo <= 7 ? "text-info" : "text-muted";
-                            <div class="d-flex align-items-center gap-2 py-2 border-bottom">
-                                <div style="width:4px;min-height:36px;border-radius:2px;background:@stripe;flex-shrink:0"></div>
-                                <div class="flex-grow-1 overflow-hidden">
-                                    <a asp-page="/Meetings/Detail" asp-route-id="@m.Id"
-                                       asp-route-returnPageId="@Model.NavItem?.Id"
-                                       class="text-decoration-none text-body fw-semibold d-block text-truncate">
-                                        @m.Thema
-                                    </a>
-                                    <div class="mt-1">
-                                        @if (!string.IsNullOrEmpty(m.ProjectName))
-                                        {
-                                            <a href="@Url.Page("/Projects/Detail", new { id = m.ProjectId })"
-                                               class="badge bg-light text-dark border me-1 text-decoration-none small">
-                                                <i class="bi bi-kanban me-1"></i>@m.ProjectName
-                                            </a>
-                                        }
-                                        @if (!string.IsNullOrEmpty(m.Gruppe))
-                                        {
-                                            <span class="badge bg-light text-dark border me-1 small">@m.Gruppe</span>
-                                        }
-                                    </div>
-                                </div>
-                                <div class="text-end small text-nowrap flex-shrink-0">
-                                    <div class="text-muted">#@m.MeetingNr</div>
-                                    <div class="@dateClr">@m.Datum.ToString("dd.MM.yy")</div>
-                                    <div class="text-muted">@m.Leitung</div>
-                                </div>
-                            </div>
-                        }
-                    </div>
-                    @if (geplantteMeetings.Count > 15)
-                    {
-                        <div class="px-3 py-2 text-muted small">+ @(geplantteMeetings.Count - 15) weitere</div>
-                    }
-                }
-            </div>
-        </div>
-
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <h6 class="text-muted mb-0 me-2">
+            <i class="bi bi-check2-square me-2"></i>Offene Tasks
+        </h6>
+        @if (gruppen.Count > 1)
+        {
+            <button type="button" class="btn btn-sm btn-outline-secondary hm-chip" data-gruppe="">Alle Gruppen</button>
+            @foreach (var g in gruppen)
+            {
+                <button type="button" class="btn btn-sm btn-outline-secondary hm-chip" data-gruppe="@g">
+                    @g <span class="text-muted">@offeneTodos.Count(t => string.Equals(t.Gruppe, g, StringComparison.OrdinalIgnoreCase))</span>
+                </button>
+            }
+        }
+        @if (hatIdentitaet)
+        {
+            <button type="button" class="btn btn-sm btn-outline-secondary hm-toggle @(gruppen.Count > 1 ? "ms-2" : "")"
+                    title="Nur Tasks zeigen, für die ich verantwortlich bin">
+                <i class="bi bi-person me-1"></i>Nur meine <span class="text-muted">@meineCount</span>
+            </button>
+        }
     </div>
+
+    <div class="row g-3">
+        @foreach (var b in buckets)
+        {
+            <div class="col-lg-4 hm-bucket" data-bucket="@b.Key" data-expanded="0">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body p-3">
+                        <div class="d-flex align-items-center small @b.Farbe mb-2">
+                            <i class="bi @b.Icon me-2"></i>@b.Titel
+                            <span class="ms-auto fw-bold hm-count">@b.Items.Count</span>
+                        </div>
+
+                        <div class="hm-empty text-muted small border-top pt-2 @(b.Items.Any() ? "d-none" : "")">
+                            Keine Tasks.
+                        </div>
+
+                        @foreach (var t in b.Items)
+                        {
+                            <div class="hm-row border-top py-2" data-gruppe="@t.Gruppe" data-meine="@(IstMeine(t) ? "1" : "0")">
+                                <a asp-page="/Todos/Detail" asp-route-id="@t.Id"
+                                   asp-route-returnPageId="@Model.NavItem?.Id"
+                                   class="text-decoration-none text-body d-block lh-sm">
+                                    @t.Thema
+                                </a>
+                                <div class="small text-muted mt-1 d-flex flex-wrap align-items-center gap-1">
+                                    <span>#@t.TaskNr</span>
+                                    <span>·</span>
+                                    <span>@t.ErledigenBis.ToString("dd.MM.yy")</span>
+                                    @if (!string.IsNullOrEmpty(t.Verantwortlich))
+                                    {
+                                        <span>·</span>
+                                        <span>@t.Verantwortlich</span>
+                                    }
+                                    @if (!string.IsNullOrEmpty(t.ProjectName))
+                                    {
+                                        <a href="@Url.Page("/Projects/Detail", new { id = t.ProjectId })"
+                                           class="badge bg-light text-dark border text-decoration-none fw-normal ms-1">
+                                            <i class="bi bi-kanban me-1"></i>@t.ProjectName
+                                        </a>
+                                    }
+                                </div>
+                            </div>
+                        }
+
+                        <button type="button" class="btn btn-link btn-sm p-0 mt-2 text-decoration-none hm-more d-none"></button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <style>
+        .hm-kpi { cursor: pointer; background: var(--bs-card-bg, #fff); }
+        .hm-kpi-active { outline: 2px solid var(--cms-accent); outline-offset: -2px; }
+        .hm-chip.active, .hm-toggle.active { background: var(--cms-blue); border-color: var(--cms-blue); color: #fff; }
+        .hm-chip.active .text-muted, .hm-toggle.active .text-muted { color: rgba(255,255,255,.75) !important; }
+    </style>
+
+    <script>
+    (function () {
+        var TOP = 5;
+        var state = {
+            gruppe: sessionStorage.getItem('mycms_home_gruppe') || '',
+            bucket: sessionStorage.getItem('mycms_home_bucket') || '',
+            meine:  sessionStorage.getItem('mycms_home_meine')  === '1'
+        };
+
+        function render() {
+            var gesamt = 0, proTopf = {};
+
+            document.querySelectorAll('.hm-bucket').forEach(function (col) {
+                var key     = col.dataset.bucket;
+                var expand  = col.dataset.expanded === '1';
+                var rows    = Array.prototype.slice.call(col.querySelectorAll('.hm-row'));
+                var treffer = rows.filter(function (r) {
+                    if (state.gruppe && r.dataset.gruppe !== state.gruppe) { return false; }
+                    if (state.meine  && r.dataset.meine  !== '1')          { return false; }
+                    return true;
+                });
+
+                rows.forEach(function (r) { r.classList.add('d-none'); });
+                treffer.forEach(function (r, i) {
+                    if (expand || i < TOP) { r.classList.remove('d-none'); }
+                });
+
+                col.classList.toggle('d-none', !!state.bucket && state.bucket !== key);
+                col.querySelector('.hm-count').textContent = treffer.length;
+                col.querySelector('.hm-empty').classList.toggle('d-none', treffer.length > 0);
+
+                var mehr = col.querySelector('.hm-more');
+                var rest = treffer.length - TOP;
+                if (rest > 0 || expand) {
+                    mehr.classList.remove('d-none');
+                    mehr.textContent = expand ? 'weniger anzeigen' : rest + ' weitere anzeigen';
+                } else {
+                    mehr.classList.add('d-none');
+                }
+
+                proTopf[key] = treffer.length;
+                gesamt += treffer.length;
+            });
+
+            var set = function (name, wert) {
+                var el = document.querySelector('[data-kpi="' + name + '"]');
+                if (el) { el.textContent = wert; }
+            };
+            set('ueberfaellig', proTopf['ueberfaellig'] || 0);
+            set('monat',        proTopf['monat']        || 0);
+            set('offen',        gesamt);
+
+            document.querySelectorAll('.hm-chip').forEach(function (c) {
+                c.classList.toggle('active', (c.dataset.gruppe || '') === state.gruppe);
+            });
+            document.querySelectorAll('.hm-toggle').forEach(function (m) {
+                m.classList.toggle('active', state.meine);
+            });
+            document.querySelectorAll('.hm-kpi').forEach(function (k) {
+                k.classList.toggle('hm-kpi-active', !!state.bucket && k.dataset.bucket === state.bucket);
+            });
+        }
+
+        document.querySelectorAll('.hm-chip').forEach(function (c) {
+            c.addEventListener('click', function () {
+                var g = c.dataset.gruppe || '';
+                state.gruppe = (state.gruppe === g) ? '' : g;
+                sessionStorage.setItem('mycms_home_gruppe', state.gruppe);
+                render();
+            });
+        });
+
+        document.querySelectorAll('.hm-toggle').forEach(function (m) {
+            m.addEventListener('click', function () {
+                state.meine = !state.meine;
+                sessionStorage.setItem('mycms_home_meine', state.meine ? '1' : '0');
+                render();
+            });
+        });
+
+        document.querySelectorAll('.hm-kpi').forEach(function (k) {
+            k.addEventListener('click', function () {
+                var b = k.dataset.bucket || '';
+                state.bucket = (state.bucket === b) ? '' : b;
+                sessionStorage.setItem('mycms_home_bucket', state.bucket);
+                render();
+            });
+        });
+
+        document.querySelectorAll('.hm-bucket').forEach(function (col) {
+            col.querySelector('.hm-more').addEventListener('click', function () {
+                col.dataset.expanded = col.dataset.expanded === '1' ? '0' : '1';
+                render();
+            });
+        });
+
+        render();
+    })();
+    </script>
 }
 
 @* ── Meeting Timeline ──────────────────────────────────────── *@

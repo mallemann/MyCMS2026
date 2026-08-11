@@ -22,15 +22,21 @@ public class MeetingsIndexModel : PageModel
     public string? StatusFilter { get; set; }
     public string? KlasseFilter { get; set; }
     public string? Gruppe { get; set; }
+    public bool NurZukunft { get; set; }
 
-    public async Task OnGetAsync(string? search, string? status, string? klasse, string? gruppe)
+    public async Task OnGetAsync(string? search, string? status, string? klasse, string? gruppe, bool zukunft = false)
     {
         Search       = search;
         StatusFilter = status;
         KlasseFilter = klasse;
         Gruppe       = gruppe;
+        NurZukunft   = zukunft;
 
         var all = await _meetings.GetAllAsync();
+
+        // Nur Termine ab heute (Einstieg von der Startseite: «Alle geplanten Meetings»)
+        if (zukunft)
+            all = all.Where(m => m.Datum.Date >= DateTime.Today).ToList();
 
         // Gruppen-Filter
         if (!string.IsNullOrWhiteSpace(gruppe))

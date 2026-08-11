@@ -60,6 +60,13 @@
                 </select>
             </div>
             <div class="col-auto">
+                <div class="form-check">
+                    <input type="checkbox" name="zukunft" value="true" id="fZukunft"
+                           class="form-check-input" checked="@(Model.NurZukunft ? "checked" : null)" />
+                    <label for="fZukunft" class="form-check-label small">Nur ab heute</label>
+                </div>
+            </div>
+            <div class="col-auto">
                 <button type="submit" class="btn btn-cms btn-sm"><i class="bi bi-funnel me-1"></i>Filter</button>
                 <a asp-page="Index" asp-route-gruppe="@gruppe" class="btn btn-outline-secondary btn-sm ms-1">Reset</a>
             </div>
