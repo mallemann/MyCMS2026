@@ -140,6 +140,15 @@ Beim Publish werden Laufzeitdaten und `appsettings.Production.json` bewusst ausg
 
 ---
 
+## Vollständige Dokumentation
+
+Eine Vollständige Dokumentation for Anwender und Administratoren:
+- Anwenderhandbuch https://masdrive.ch/myprojects/assets/media/2026/08/software/mycms2026-anwenderhandbuch.pdf
+- Administration https://masdrive.ch/myprojects/assets/media/2026/08/software/mycms2026-administration-sichtbarkeit.pdf
+- Installation mit Deployment Template https://masdrive.ch/myprojects/assets/media/2026/08/software/mycms2026-installation-inbetriebnahme.pdf 
+
+---
+
 ## Sicherheitshinweise
 
 - Keine Secrets im Repository – produktive Zugangsdaten gehören ausschließlich in die nicht getrackte `appsettings.Production.json`.
