@@ -60,11 +60,14 @@
          Items: offeneTodos.Where(t => t.ErledigenBis.Date >  monatsEnde).ToList())
     };
 
-    // Gruppen-Chips nur anbieten, wenn es überhaupt mehr als eine Gruppe gibt
-    var gruppen = offeneTodos.Select(t => t.Gruppe)
-                             .Where(g => !string.IsNullOrWhiteSpace(g))
+    // Gruppen-Chips: alle Gruppen, die in den sichtbaren offenen Tasks vorkommen
+    var gruppen = offeneTodos.Select(t => (t.Gruppe ?? "").Trim())
+                             .Where(g => g.Length > 0)
                              .Distinct(StringComparer.OrdinalIgnoreCase)
                              .OrderBy(g => g).ToList();
+
+    var ohneGruppe = offeneTodos.Count(t => string.IsNullOrWhiteSpace(t.Gruppe));
+    var zeigeChips = gruppen.Any() || ohneGruppe > 0;
 
     // «Nur meine»: Verantwortlich trägt das Kürzel, ältere Einträge den Benutzernamen (Muster aus _wToDo)
     var currentKuerzel = User.FindFirst("Kuerzel")?.Value ?? "";
@@ -196,19 +199,25 @@
         <h6 class="text-muted mb-0 me-2">
             <i class="bi bi-check2-square me-2"></i>Offene Tasks
         </h6>
-        @if (gruppen.Count > 1)
+        @if (zeigeChips)
         {
             <button type="button" class="btn btn-sm btn-outline-secondary hm-chip" data-gruppe="">Alle Gruppen</button>
             @foreach (var g in gruppen)
             {
                 <button type="button" class="btn btn-sm btn-outline-secondary hm-chip" data-gruppe="@g">
-                    @g <span class="text-muted">@offeneTodos.Count(t => string.Equals(t.Gruppe, g, StringComparison.OrdinalIgnoreCase))</span>
+                    @g <span class="text-muted">@offeneTodos.Count(t => string.Equals((t.Gruppe ?? "").Trim(), g, StringComparison.OrdinalIgnoreCase))</span>
+                </button>
+            }
+            @if (ohneGruppe > 0)
+            {
+                <button type="button" class="btn btn-sm btn-outline-secondary hm-chip" data-gruppe="__ohne__">
+                    Ohne Gruppe <span class="text-muted">@ohneGruppe</span>
                 </button>
             }
         }
         @if (hatIdentitaet)
         {
-            <button type="button" class="btn btn-sm btn-outline-secondary hm-toggle @(gruppen.Count > 1 ? "ms-2" : "")"
+            <button type="button" class="btn btn-sm btn-outline-secondary hm-toggle @(zeigeChips ? "ms-2" : "")"
                     title="Nur Tasks zeigen, für die ich verantwortlich bin">
                 <i class="bi bi-person me-1"></i>Nur meine <span class="text-muted">@meineCount</span>
             </button>
@@ -232,7 +241,7 @@
 
                         @foreach (var t in b.Items)
                         {
-                            <div class="hm-row border-top py-2" data-gruppe="@t.Gruppe" data-meine="@(IstMeine(t) ? "1" : "0")">
+                            <div class="hm-row border-top py-2" data-gruppe="@((t.Gruppe ?? "").Trim())" data-meine="@(IstMeine(t) ? "1" : "0")">
                                 <a asp-page="/Todos/Detail" asp-route-id="@t.Id"
                                    asp-route-returnPageId="@Model.NavItem?.Id"
                                    class="text-decoration-none text-body d-block lh-sm">
@@ -289,8 +298,13 @@
                 var expand  = col.dataset.expanded === '1';
                 var rows    = Array.prototype.slice.call(col.querySelectorAll('.hm-row'));
                 var treffer = rows.filter(function (r) {
-                    if (state.gruppe && r.dataset.gruppe !== state.gruppe) { return false; }
-                    if (state.meine  && r.dataset.meine  !== '1')          { return false; }
+                    var g = (r.dataset.gruppe || '').toLowerCase();
+                    if (state.gruppe === '__ohne__') {
+                        if (g !== '') { return false; }
+                    } else if (state.gruppe && g !== state.gruppe.toLowerCase()) {
+                        return false;
+                    }
+                    if (state.meine && r.dataset.meine !== '1') { return false; }
                     return true;
                 });
 
