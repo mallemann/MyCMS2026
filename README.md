@@ -146,13 +146,16 @@ Projektübersicht: https://masdrive.ch/myprojects/projects/mycms2026/
 
 Eine Vollständige Dokumentation for Anwender und Administratoren:
 
-Anwenderhandbuch: 
+Anwenderhandbuch:
+
 https://masdrive.ch/myprojects/assets/media/2026/08/software/mycms2026-anwenderhandbuch.pdf
 
 Administration 
+
 https://masdrive.ch/myprojects/assets/media/2026/08/software/mycms2026-administration-sichtbarkeit.pdf
 
 Installation mit Deployment Template 
+
 https://masdrive.ch/myprojects/assets/media/2026/08/software/mycms2026-installation-inbetriebnahme.pdf 
 
 ---
