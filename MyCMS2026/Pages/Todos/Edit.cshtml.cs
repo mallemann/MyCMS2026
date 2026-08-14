@@ -195,9 +195,26 @@ public class TodoEditModel : PageModel
     public async Task<IActionResult> OnPostDeleteFileAsync(string id, string fileId)
     {
         var existing = await _todos.GetByIdAsync(id);
-        var gruppe   = existing?.Gruppe;
-        var retProj  = existing?.ProjectId;
+        if (existing == null) return NotFound();
+
+        // Gleiche Bedingung wie der Edit-Zweig in OnPostAsync: Wer bearbeiten darf,
+        // darf auch Dateien löschen. Das Recht kann aus Admin, Ersteller, der
+        // Projekt-BearbeitenRolle oder der ExtendedAccessRole der Nav-Seite stammen.
+        var canEdit = User.IsInRole("Administrator")
+            || existing.CreatedBy == User.Identity?.Name
+            || await IsProjectEditorAsync(existing.ProjectId)
+            || await HasNavExtendedAccessAsync(ReturnPageId);
+        if (!canEdit) return Forbid();
+
+        var gruppe = existing.Gruppe;
         await _todos.DeleteFileAsync(id, fileId);
-        return RedirectToPage(new { id, gruppe = string.IsNullOrWhiteSpace(gruppe) ? null : gruppe });
+        // ReturnPageId mitgeben: sonst fehlt beim Neuaufbau der Seite der Nav-Kontext
+        // und OnGetAsync verweigert dem Nav-Bearbeiter den Zugriff.
+        return RedirectToPage(new
+        {
+            id,
+            gruppe = string.IsNullOrWhiteSpace(gruppe) ? null : gruppe,
+            returnPageId = string.IsNullOrWhiteSpace(ReturnPageId) ? null : ReturnPageId
+        });
     }
 }

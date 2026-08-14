@@ -46,6 +46,8 @@
             <form id="delMeetingFile-@f.Id" method="post" asp-page-handler="DeleteFile" style="display:none">
                 <input type="hidden" name="id" value="@Model.Meeting.Id" />
                 <input type="hidden" name="fileId" value="@f.Id" />
+                @* Nav-Kontext mitschicken: Bearbeiten-Recht kann aus der ExtendedAccessRole der Seite kommen *@
+                <input type="hidden" name="ReturnPageId" value="@Model.ReturnPageId" />
             </form>
         }
 

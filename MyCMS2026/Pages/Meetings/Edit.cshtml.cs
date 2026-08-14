@@ -188,10 +188,25 @@ public class MeetingEditModel : PageModel
     {
         var existing = await _meetings.GetByIdAsync(id);
         if (existing == null) return NotFound();
+
+        // Gleiche Bedingung wie OnPostAsync: Wer bearbeiten darf, darf auch Dateien löschen.
+        // Das Bearbeiten-Recht kann aus der Projekt-BearbeitenRolle ODER aus der
+        // ExtendedAccessRole der Nav-Seite stammen (ReturnPageId aus dem Delete-Formular).
         var isAdmin = User.IsInRole("Administrator");
-        if (!isAdmin && !await IsProjectEditorAsync(existing.ProjectId)) return Forbid();
+        var canEdit = isAdmin
+            || await IsProjectEditorAsync(existing.ProjectId)
+            || await HasNavExtendedAccessAsync(ReturnPageId);
+        if (!canEdit) return Forbid();
+
         var gruppe = existing.Gruppe;
         await _meetings.DeleteFileAsync(id, fileId);
-        return RedirectToPage(new { id, gruppe = string.IsNullOrWhiteSpace(gruppe) ? null : gruppe });
+        // ReturnPageId mitgeben: sonst fehlt beim Neuaufbau der Seite der Nav-Kontext
+        // und OnGetAsync verweigert dem Nav-Bearbeiter den Zugriff.
+        return RedirectToPage(new
+        {
+            id,
+            gruppe = string.IsNullOrWhiteSpace(gruppe) ? null : gruppe,
+            returnPageId = string.IsNullOrWhiteSpace(ReturnPageId) ? null : ReturnPageId
+        });
     }
 }
