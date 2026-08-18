@@ -102,7 +102,9 @@ public class TodoService
             }
             await SaveAsync(items);
         }
-        return items.OrderBy(t => t.Erledigt).ThenBy(t => t.ErledigenBis).ToList();
+        var offen = items.Where(t => !t.Erledigt).OrderBy(t => t.ErledigenBis);
+        var erledigt = items.Where(t => t.Erledigt).OrderByDescending(t => t.ErledigenBis);
+        return offen.Concat(erledigt).ToList();
     }
 
     public async Task<TodoItem?> GetByIdAsync(string id) =>

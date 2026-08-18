@@ -509,7 +509,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var t in Model.Todos.OrderBy(t => t.Erledigt).ThenBy(t => t.ErledigenBis))
+                            @foreach (var t in Model.Todos)
                             {
                                 <tr class="@(t.Erledigt ? "text-muted" : "")">
                                     <td>@t.TaskNr</td>
